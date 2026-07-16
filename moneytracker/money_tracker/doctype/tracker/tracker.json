@@ -1,0 +1,84 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-07-16 15:23:16.886165",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tracker_name",
+  "tracker_type",
+  "base_currency",
+  "owner_user",
+  "is_archived"
+ ],
+ "fields": [
+  {
+   "fieldname": "tracker_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tracker Name",
+   "reqd": 1
+  },
+  {
+   "default": "Personal",
+   "fieldname": "tracker_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tracker Type",
+   "options": "Personal\nBusiness\nTrip\nFamily\nProject",
+   "reqd": 1
+  },
+  {
+   "default": "INR",
+   "fieldname": "base_currency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Base Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Is Archived"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-16 15:23:16.886165",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Tracker",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

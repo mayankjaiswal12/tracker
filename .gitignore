@@ -1,0 +1,90 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.pyre/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Frappe / Bench
+sites/assets/
+sites/*/private/
+sites/*/public/files/
+sites/*/locks/
+sites/*/logs/
+sites/*/backups/
+sites/*/index.html
+sites/*/site_config.json
+sites/.build
+sites/apps.txt
+
+# Redis / PID
+*.pid
+redis*.pid
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Build
+dist/
+build/
+
+# Claude / AI context
+CLAUDE.md
+context.md
+task.md
+plan.md
+patches.txt
+PERSONAL_FINANCE_ARCHITECTURE_REPORT.md
+
+# Local work
+archived/
+day1_submission/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+config/
+Procfile
