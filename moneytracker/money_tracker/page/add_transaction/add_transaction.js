@@ -86,7 +86,7 @@ class AddTransaction {
 		}
 
 		frappe.call({
-			method: 'moneytracker.money_tracker.transaction_service.create_transaction',
+			method: 'moneytracker.money_tracker.api.transactions.create_transaction',
 			args: values,
 			freeze: true,
 			freeze_message: 'Posting transaction...',

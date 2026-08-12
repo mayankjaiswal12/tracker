@@ -1,46 +1,93 @@
 {
  "actions": [],
- "allow_rename": 1,
+ "allow_import": 1,
  "autoname": "TXN-.#####",
  "creation": "2026-07-16 15:25:55.279450",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "tracker",
   "transaction_type",
   "date",
+  "time",
+  "column_break_head",
+  "tracker",
+  "company",
+  "amount_section",
   "amount",
   "currency",
+  "column_break_amount",
+  "exchange_rate",
+  "base_amount",
+  "accounts_section",
   "account",
   "destination_account",
+  "column_break_accounts",
   "category",
+  "payment_method",
+  "details_section",
+  "merchant",
+  "payee",
+  "column_break_details",
+  "is_reimbursable",
+  "is_tax_deductible",
   "notes",
-  "journal_entry"
+  "ledger_section",
+  "journal_entry",
+  "reversal_of",
+  "amended_from"
  ],
  "fields": [
-  {
-   "fieldname": "tracker",
-   "fieldtype": "Link",
-   "label": "Tracker",
-   "options": "Tracker",
-   "reqd": 1
-  },
   {
    "fieldname": "transaction_type",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Transaction Type",
-   "options": "Income\nExpense\nTransfer",
-   "reqd": 1
+   "options": "Expense\nIncome\nTransfer\nRefund\nReimbursement\nAdjustment\nCredit Card Payment\nLoan Payment\nInvestment Purchase\nInvestment Sale\nDividend\nInterest\nAsset Purchase\nAsset Sale",
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Date",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "time",
+   "fieldtype": "Time",
+   "label": "Time"
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Tracker",
+   "options": "Tracker",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount"
   },
   {
    "fieldname": "amount",
@@ -52,7 +99,6 @@
    "reqd": 1
   },
   {
-   "default": "INR",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
@@ -60,29 +106,101 @@
    "reqd": 1
   },
   {
+   "fieldname": "column_break_amount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Rate from the transaction currency to the base currency. Overridable; the original amount is never altered.",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9"
+  },
+  {
+   "description": "Amount converted to base currency, for reporting only.",
+   "fieldname": "base_amount",
+   "fieldtype": "Currency",
+   "label": "Amount (Base Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "description": "The account the money moves out of (or into, for income).",
    "fieldname": "account",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Account",
    "options": "Money Account",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
-   "depends_on": "eval:doc.transaction_type=='Transfer'",
+   "depends_on": "eval:['Transfer','Credit Card Payment','Loan Payment','Investment Purchase','Investment Sale','Asset Purchase','Asset Sale'].includes(doc.transaction_type)",
    "fieldname": "destination_account",
    "fieldtype": "Link",
    "label": "Destination Account",
-   "mandatory_depends_on": "eval:doc.transaction_type=='Transfer'",
-   "options": "Money Account"
+   "options": "Money Account",
+   "search_index": 1
   },
   {
-   "depends_on": "eval:doc.transaction_type!='Transfer'",
+   "fieldname": "column_break_accounts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:!['Transfer','Credit Card Payment'].includes(doc.transaction_type)",
    "fieldname": "category",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Category",
-   "mandatory_depends_on": "eval:doc.transaction_type!='Transfer'",
-   "options": "Category"
+   "options": "Category",
+   "search_index": 1
+  },
+  {
+   "fieldname": "payment_method",
+   "fieldtype": "Link",
+   "label": "Payment Method",
+   "options": "Money Payment Method"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "More"
+  },
+  {
+   "fieldname": "merchant",
+   "fieldtype": "Data",
+   "label": "Merchant",
+   "search_index": 1
+  },
+  {
+   "fieldname": "payee",
+   "fieldtype": "Data",
+   "label": "Payee"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_reimbursable",
+   "fieldtype": "Check",
+   "label": "Is Reimbursable"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_tax_deductible",
+   "fieldtype": "Check",
+   "label": "Is Tax Deductible"
   },
   {
    "fieldname": "notes",
@@ -90,24 +208,53 @@
    "label": "Notes"
   },
   {
+   "collapsible": 1,
+   "fieldname": "ledger_section",
+   "fieldtype": "Section Break",
+   "label": "Ledger"
+  },
+  {
    "fieldname": "journal_entry",
    "fieldtype": "Link",
    "label": "Journal Entry",
-   "options": "Money Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Set when this transaction was created to reverse another.",
+   "fieldname": "reversal_of",
+   "fieldtype": "Link",
+   "label": "Reversal Of",
+   "no_copy": 1,
+   "options": "Transaction",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Transaction",
+   "print_hide": 1,
    "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-07-16 15:25:55.638326",
+ "modified": "2026-08-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Transaction",
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
+   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -115,23 +262,33 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
+   "cancel": 1,
    "create": 1,
+   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "All",
+   "role": "Finance User",
    "share": 1,
+   "submit": 1,
    "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
   }
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "sort_field": "modified",
+ "sort_field": "date",
  "sort_order": "DESC",
  "states": []
 }

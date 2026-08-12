@@ -1,37 +1,44 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:account_name",
+ "autoname": "hash",
  "creation": "2026-07-16 15:25:01.925271",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "account_name",
-  "tracker",
   "account_type",
-  "ledger_account",
+  "tracker",
+  "account_group",
+  "column_break_main",
   "currency",
+  "institution",
+  "opening_date",
+  "is_active",
+  "balances_section",
   "opening_balance",
   "current_balance",
+  "column_break_balances",
   "credit_limit",
+  "ledger_account",
+  "presentation_section",
   "icon",
   "color",
-  "is_archived"
+  "column_break_presentation",
+  "include_in_net_worth",
+  "include_in_available_balance",
+  "details_section",
+  "account_number_masked",
+  "notes"
  ],
  "fields": [
   {
    "fieldname": "account_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Account Name",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "fieldname": "tracker",
-   "fieldtype": "Link",
-   "label": "Tracker",
-   "options": "Tracker",
    "reqd": 1
   },
   {
@@ -39,23 +46,56 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Account Type",
-   "options": "Cash\nWallet\nBank\nCredit Card\nLoan\nInvestment\nGoal",
-   "reqd": 1
+   "options": "Bank\nCash\nWallet\nSavings\nCurrent Account\nCredit Card\nInvestment\nBrokerage\nFixed Deposit\nRecurring Deposit\nVirtual\nLoan\nInsurance\nProperty\nVehicle\nOther Asset\nOther Liability",
+   "reqd": 1,
+   "search_index": 1
   },
   {
-   "fieldname": "ledger_account",
+   "fieldname": "tracker",
    "fieldtype": "Link",
-   "label": "Ledger Account",
-   "options": "Ledger Account",
-   "read_only": 1
+   "label": "Tracker",
+   "options": "Tracker",
+   "reqd": 1,
+   "search_index": 1
   },
   {
-   "default": "INR",
+   "fieldname": "account_group",
+   "fieldtype": "Link",
+   "label": "Account Group",
+   "options": "Money Account Group"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
    "options": "Currency",
    "reqd": 1
+  },
+  {
+   "description": "Bank, card issuer or provider name.",
+   "fieldname": "institution",
+   "fieldtype": "Data",
+   "label": "Institution"
+  },
+  {
+   "fieldname": "opening_date",
+   "fieldtype": "Date",
+   "label": "Opening Date"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "balances_section",
+   "fieldtype": "Section Break",
+   "label": "Balances"
   },
   {
    "default": "0",
@@ -66,12 +106,17 @@
   },
   {
    "default": "0",
+   "description": "Cached from the ledger. GL Entry is the source of truth; use Recompute Balances to refresh.",
    "fieldname": "current_balance",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Current Balance",
    "options": "currency",
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_balances",
+   "fieldtype": "Column Break"
   },
   {
    "depends_on": "eval:doc.account_type=='Credit Card'",
@@ -81,26 +126,66 @@
    "options": "currency"
   },
   {
+   "description": "The ERPNext Account this maps to. Created automatically.",
+   "fieldname": "ledger_account",
+   "fieldtype": "Link",
+   "label": "Ledger Account",
+   "options": "Account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "presentation_section",
+   "fieldtype": "Section Break",
+   "label": "Presentation"
+  },
+  {
    "fieldname": "icon",
    "fieldtype": "Data",
    "label": "Icon"
   },
   {
    "fieldname": "color",
-   "fieldtype": "Data",
+   "fieldtype": "Color",
    "label": "Color"
   },
   {
-   "default": "0",
-   "fieldname": "is_archived",
+   "fieldname": "column_break_presentation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "include_in_net_worth",
    "fieldtype": "Check",
-   "label": "Is Archived"
+   "label": "Include in Net Worth"
+  },
+  {
+   "default": "1",
+   "fieldname": "include_in_available_balance",
+   "fieldtype": "Check",
+   "label": "Include in Available Balance"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "description": "Last 4 digits only. Never store a full card or account number, CVV, PIN or banking password.",
+   "fieldname": "account_number_masked",
+   "fieldtype": "Data",
+   "label": "Account Identifier (masked)",
+   "length": 8
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-16 15:25:01.925271",
+ "modified": "2026-08-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Money Account",
@@ -108,6 +193,7 @@
  "permissions": [
   {
    "create": 1,
+   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -119,19 +205,28 @@
   },
   {
    "create": 1,
+   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "All",
+   "role": "Finance User",
    "share": 1,
    "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
   }
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "account_name"
 }

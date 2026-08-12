@@ -1,0 +1,8 @@
+[pre_model_sync]
+
+[post_model_sync]
+moneytracker.patches.v1_0.seed_money_settings
+moneytracker.patches.v1_0.drop_legacy_ledger
+moneytracker.patches.v1_0.register_tracker_dimension
+moneytracker.patches.v1_0.allow_transaction_reference
+moneytracker.patches.v1_0.setup_finance_roles
