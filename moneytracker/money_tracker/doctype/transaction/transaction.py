@@ -88,6 +88,12 @@ class Transaction(Document):
 				self.destination_account,
 				self.account,
 			)
+			if self.transaction_type == "Credit Card Payment":
+				# Undoing a card payment means Dr bank / Cr card — money going back the other
+				# way. That is not itself a card payment, which always debits the card, so the
+				# swapped pair would be refused as "destination is a Bank, not a liability".
+				# It is a settlement between two balance-sheet accounts: a Transfer.
+				reversal.transaction_type = "Transfer"
 		elif self.transaction_type == "Expense":
 			reversal.transaction_type = "Refund"
 		elif self.transaction_type == "Refund":

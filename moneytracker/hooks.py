@@ -180,7 +180,7 @@ has_permission = {
 # Testing
 # -------
 
-# before_tests = "moneytracker.install.before_tests"
+before_tests = "moneytracker.money_tracker.setup.before_tests"
 
 # Overriding Methods
 # ------------------------------

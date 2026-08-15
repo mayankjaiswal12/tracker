@@ -1,4 +1,4 @@
-### Money Tracker
+f### Money Tracker
 
 A personal finance tracker with a double-entry ledger core
 

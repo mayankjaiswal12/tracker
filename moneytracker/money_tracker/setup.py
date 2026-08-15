@@ -66,3 +66,30 @@ def seed_money_settings():
 def after_install():
 	create_finance_roles()
 	seed_money_settings()
+
+
+def before_tests():
+	"""Bring a bare site up to the minimum the suite needs, then say so if it cannot.
+
+	Reuses the install path rather than adding a second seeding route. The Fiscal Year check
+	is a hard stop on purpose: without one, ERPNext refuses every posting and the whole
+	suite fails with an error that says nothing about the real cause.
+	"""
+	# Every fixture in the suite is built explicitly by moneytracker.tests.utils, so Frappe's
+	# automatic test records buy nothing — and they are actively harmful here: the runner
+	# walks link fields recursively, so a Money Account test drags in Account → Company →
+	# … → Payment Gateway, which does not exist unless the payments app is installed, and
+	# the whole run dies during collection.
+	frappe.flags.skip_test_records = True
+
+	create_finance_roles()
+	seed_money_settings()
+	frappe.db.commit()
+
+	if not frappe.db.get_single_value("Money Settings", "company"):
+		raise RuntimeError(
+			"Money Settings has no Company. Every posting path throws without one — "
+			"set it before running the tests."
+		)
+	if not frappe.db.count("Fiscal Year"):
+		raise RuntimeError("No Fiscal Year on this site; ERPNext refuses every posting.")
