@@ -6,3 +6,4 @@ moneytracker.patches.v1_0.drop_legacy_ledger
 moneytracker.patches.v1_0.register_tracker_dimension
 moneytracker.patches.v1_0.allow_transaction_reference
 moneytracker.patches.v1_0.setup_finance_roles
+moneytracker.patches.v1_0.rename_records_to_series
