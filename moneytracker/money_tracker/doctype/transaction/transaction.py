@@ -25,6 +25,7 @@ class Transaction(Document):
 	def validate(self):
 		self.validate_amount()
 		self.validate_accounts()
+		self.validate_category()
 		self.set_base_amount()
 
 	def validate_amount(self):
@@ -41,10 +42,26 @@ class Transaction(Document):
 		elif self.destination_account:
 			self.destination_account = None
 
-	def set_base_amount(self):
-		base_amount, rate = fx.to_base_currency(
-			self.amount, self.currency, self.date, self.exchange_rate
+	def validate_category(self):
+		"""A group category is a heading, not a place to post.
+
+		Caught here rather than at submit: the posting engine would fail too, on the missing
+		ledger account, but by then the user has already filled in a whole voucher and the
+		message talks about accounting rather than about the choice they made.
+		"""
+		if not self.category:
+			return
+
+		category_name, is_group = frappe.db.get_value(
+			"Category", self.category, ["category_name", "is_group"]
 		)
+		if is_group:
+			frappe.throw(
+				_("{0} is a group category. Post to one of its sub-categories instead.").format(category_name)
+			)
+
+	def set_base_amount(self):
+		base_amount, rate = fx.to_base_currency(self.amount, self.currency, self.date, self.exchange_rate)
 		self.exchange_rate = rate
 		self.base_amount = base_amount
 
@@ -99,9 +116,7 @@ class Transaction(Document):
 		elif self.transaction_type == "Refund":
 			reversal.transaction_type = "Expense"
 		elif self.transaction_type == "Income":
-			frappe.throw(
-				_("Reversing an Income is not supported yet. Cancel the transaction instead.")
-			)
+			frappe.throw(_("Reversing an Income is not supported yet. Cancel the transaction instead."))
 
 		reversal.insert()
 		reversal.submit()

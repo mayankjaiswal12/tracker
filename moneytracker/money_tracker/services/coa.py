@@ -41,7 +41,10 @@ ACCOUNT_TYPE_MAP = {
 PARENT_FALLBACKS = {
 	"bank_parent_account": ("Bank Accounts", "Current Assets", "Application of Funds (Assets)"),
 	"cash_parent_account": ("Cash In Hand", "Current Assets", "Application of Funds (Assets)"),
-	"current_asset_parent_account": ("Current Assets", "Application of Funds (Assets)",),
+	"current_asset_parent_account": (
+		"Current Assets",
+		"Application of Funds (Assets)",
+	),
 	"fixed_asset_parent_account": ("Fixed Assets", "Application of Funds (Assets)"),
 	"liability_parent_account": ("Current Liabilities", "Source of Funds (Liabilities)"),
 	"income_parent_account": ("Direct Income", "Income"),
@@ -106,13 +109,28 @@ def get_or_create_ledger_account(account_name, parent_field, account_type=None, 
 	# "<account_name> - <abbr>" and ignores the parent, so the same name under a different
 	# parent is not a second account — it is a primary-key collision. Including the parent
 	# here would miss the existing row and then die on a duplicate insert.
-	existing = frappe.db.get_value(
-		"Account",
-		{"company": company, "account_name": account_name, "is_group": 0},
-		"name",
-	)
+	#
+	# `root_type` however *is* part of the match. ERPNext's standard chart ships "Salary" as
+	# an **expense**, so matching on the name alone handed an income category called Salary
+	# the expense account: wages landed in expenses and income read zero.
+	def match(name):
+		return frappe.db.get_value(
+			"Account",
+			{"company": company, "account_name": name, "is_group": 0, "root_type": root_type},
+			"name",
+		)
+
+	existing = match(account_name)
 	if existing:
 		return existing
+
+	if frappe.db.exists("Account", {"company": company, "account_name": account_name}):
+		# The plain name belongs to an account we must not post into. Qualify rather than
+		# reuse it — and rather than die on ERPNext's duplicate-name check.
+		account_name = f"{account_name} ({root_type})"
+		existing = match(account_name)
+		if existing:
+			return existing
 
 	account = frappe.get_doc(
 		{

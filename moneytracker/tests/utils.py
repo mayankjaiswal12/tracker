@@ -34,24 +34,34 @@ def unique(prefix):
 
 
 def posting_date():
-	"""A date inside the site's Fiscal Year.
+	"""A date inside a Fiscal Year, preferring today.
 
-	Resolved rather than hardcoded: ERPNext throws for a posting outside a Fiscal Year, and
-	this site has exactly one (2026-04-01 → 2027-03-31), so a literal date would start
-	failing the day the site rolls over.
+	Resolved rather than hardcoded: ERPNext throws for a posting outside a Fiscal Year, so a
+	literal date would start failing the day the site rolls over.
+
+	Today wins whenever *any* Fiscal Year covers it. Picking the newest year instead looks
+	equivalent and is not: ERPNext's own test records seed `_Test Fiscal Year` rows out to
+	2050, and a fixture dated 2050-01-01 silently stops matching anything a test compares
+	against `today()` — which is what every dashboard figure defaults to.
 	"""
+	today = getdate(nowdate())
+	covering = frappe.db.exists(
+		"Fiscal Year",
+		{"year_start_date": ["<=", today], "year_end_date": [">=", today], "disabled": 0},
+	)
+	if covering:
+		return today
+
 	years = frappe.get_all(
 		"Fiscal Year",
-		fields=["year_start_date", "year_end_date"],
+		filters={"disabled": 0},
+		fields=["year_start_date"],
 		order_by="year_start_date desc",
 		limit=1,
 	)
 	if not years:
 		raise RuntimeError("No Fiscal Year on this site — every posting test would fail.")
-
-	start, end = getdate(years[0].year_start_date), getdate(years[0].year_end_date)
-	today = getdate(nowdate())
-	return today if start <= today <= end else start
+	return getdate(years[0].year_start_date)
 
 
 # --- factories -------------------------------------------------------------------------
@@ -59,10 +69,17 @@ def posting_date():
 # before_validate, so the API path may omit them. Desk cannot — see CLAUDE.md.
 
 
-def make_tracker(**kwargs):
+def make_tracker(seed_categories=False, **kwargs):
+	"""A tracker with no categories unless asked.
+
+	`Tracker.after_insert` seeds the default tree in real use. Fixtures opt out: ~40 extra
+	rows per tracker would dominate the suite's runtime, and they would sit in the way of
+	every test that counts the categories it created itself.
+	"""
 	kwargs.setdefault("tracker_name", unique("Tracker"))
 	kwargs.setdefault("tracker_type", "Personal")
 	doc = frappe.get_doc({"doctype": "Tracker", **kwargs})
+	doc.flags.skip_default_categories = not seed_categories
 	doc.insert(ignore_permissions=True)
 	return doc
 
