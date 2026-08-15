@@ -1,0 +1,196 @@
+{
+ "actions": [],
+ "creation": "2026-08-08 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "ledger_section",
+  "company",
+  "base_currency",
+  "column_break_ledger",
+  "default_cost_center",
+  "default_tracker",
+  "coa_section",
+  "bank_parent_account",
+  "cash_parent_account",
+  "current_asset_parent_account",
+  "fixed_asset_parent_account",
+  "column_break_coa",
+  "liability_parent_account",
+  "income_parent_account",
+  "expense_parent_account",
+  "receivable_parent_account",
+  "behaviour_section",
+  "auto_post_transactions",
+  "enable_multi_currency",
+  "column_break_behaviour",
+  "allow_negative_balance"
+ ],
+ "fields": [
+  {
+   "fieldname": "ledger_section",
+   "fieldtype": "Section Break",
+   "label": "Ledger"
+  },
+  {
+   "description": "The ERPNext Company every finance transaction posts into.",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "description": "Reporting currency. Transactions may be recorded in any currency and are converted to this one for reports.",
+   "fieldname": "base_currency",
+   "fieldtype": "Link",
+   "label": "Base Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ledger",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_cost_center",
+   "fieldtype": "Link",
+   "label": "Default Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "description": "Used when a Transaction is created without an explicit tracker.",
+   "fieldname": "default_tracker",
+   "fieldtype": "Link",
+   "label": "Default Tracker",
+   "options": "Tracker"
+  },
+  {
+   "description": "Parent accounts under which ledger accounts are auto-created for Money Accounts and Categories.",
+   "fieldname": "coa_section",
+   "fieldtype": "Section Break",
+   "label": "Chart of Accounts Mapping"
+  },
+  {
+   "fieldname": "bank_parent_account",
+   "fieldtype": "Link",
+   "label": "Bank Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "cash_parent_account",
+   "fieldtype": "Link",
+   "label": "Cash Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "current_asset_parent_account",
+   "fieldtype": "Link",
+   "label": "Current Asset Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "fixed_asset_parent_account",
+   "fieldtype": "Link",
+   "label": "Fixed Asset Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_coa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "liability_parent_account",
+   "fieldtype": "Link",
+   "label": "Liability Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "income_parent_account",
+   "fieldtype": "Link",
+   "label": "Income Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "expense_parent_account",
+   "fieldtype": "Link",
+   "label": "Expense Parent Account",
+   "options": "Account"
+  },
+  {
+   "description": "Used for reimbursable expenses and shared-expense settlements.",
+   "fieldname": "receivable_parent_account",
+   "fieldtype": "Link",
+   "label": "Receivable Parent Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "behaviour_section",
+   "fieldtype": "Section Break",
+   "label": "Behaviour"
+  },
+  {
+   "default": "1",
+   "description": "Post a Journal Entry automatically when a Transaction is submitted.",
+   "fieldname": "auto_post_transactions",
+   "fieldtype": "Check",
+   "label": "Auto Post Transactions"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_multi_currency",
+   "fieldtype": "Check",
+   "label": "Enable Multi Currency"
+  },
+  {
+   "fieldname": "column_break_behaviour",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Allow an account balance to go below zero. Disable to block overspending at posting time.",
+   "fieldname": "allow_negative_balance",
+   "fieldtype": "Check",
+   "label": "Allow Negative Balance"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-08 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Finance Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Finance User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

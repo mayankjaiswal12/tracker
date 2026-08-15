@@ -8,7 +8,9 @@ app_license = "mit"
 # Apps
 # ------------------
 
-# required_apps = []
+# The ledger is ERPNext's (Account / Journal Entry / GL Entry). Declaring the dependency
+# makes a missing ERPNext fail at install time rather than at the first posting attempt.
+required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -83,7 +85,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "moneytracker.install.before_install"
-# after_install = "moneytracker.install.after_install"
+after_install = "moneytracker.money_tracker.setup.after_install"
 
 # Uninstallation
 # ------------
@@ -117,13 +119,22 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+# All finance data lives in one shared ERPNext Company, so row-level scoping by Tracker is
+# the ONLY thing isolating one user's books from another's. These hooks are load-bearing
+# security, not a convenience — see moneytracker/money_tracker/permissions.py.
+permission_query_conditions = {
+	"Tracker": "moneytracker.money_tracker.permissions.tracker_query_conditions",
+	"Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+}
+
+has_permission = {
+	"Tracker": "moneytracker.money_tracker.permissions.tracker_has_permission",
+	"Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+}
 
 # DocType Class
 # ---------------

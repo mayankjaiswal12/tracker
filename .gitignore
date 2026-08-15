@@ -75,7 +75,8 @@ CLAUDE.md
 context.md
 task.md
 plan.md
-patches.txt
+# Only the bench-root scratch file; moneytracker/patches.txt is a real Frappe file.
+/patches.txt
 PERSONAL_FINANCE_ARCHITECTURE_REPORT.md
 
 # Local work

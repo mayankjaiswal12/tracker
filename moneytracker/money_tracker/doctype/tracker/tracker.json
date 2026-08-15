@@ -9,9 +9,11 @@
  "field_order": [
   "tracker_name",
   "tracker_type",
-  "base_currency",
   "owner_user",
-  "is_archived"
+  "column_break_main",
+  "base_currency",
+  "is_archived",
+  "description"
  ],
  "fields": [
   {
@@ -31,7 +33,20 @@
    "reqd": 1
   },
   {
-   "default": "INR",
+   "description": "Owns the tracker. Only this user, and members added in later phases, can see its data.",
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner User",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "base_currency",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -40,24 +55,21 @@
    "reqd": 1
   },
   {
-   "fieldname": "owner_user",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Owner User",
-   "options": "User",
-   "reqd": 1
-  },
-  {
    "default": "0",
    "fieldname": "is_archived",
    "fieldtype": "Check",
    "label": "Is Archived"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-16 15:23:16.886165",
+ "modified": "2026-08-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Tracker",
@@ -74,11 +86,31 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
   }
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "tracker_name"
 }

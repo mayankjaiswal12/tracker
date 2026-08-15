@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\": \"h1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\", \"col\": 12}}, {\"id\": \"s1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Add Transaction\", \"col\": 3}}, {\"id\": \"s2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transaction\", \"col\": 3}}, {\"id\": \"s3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account\", \"col\": 3}}, {\"id\": \"s4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Category\", \"col\": 3}}, {\"id\": \"sp1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Ledger (internal, read-only)</b></span>\", \"col\": 12}}, {\"id\": \"s5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tracker\", \"col\": 3}}, {\"id\": \"s6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ledger Account\", \"col\": 3}}, {\"id\": \"s7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Journal Entry\", \"col\": 3}}, {\"id\": \"s8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money GL Entry\", \"col\": 3}}]",
+ "content": "[{\"id\": \"h1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"s1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Add Transaction\", \"col\": 3}}, {\"id\": \"s2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transaction\", \"col\": 3}}, {\"id\": \"s3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account\", \"col\": 3}}, {\"id\": \"s4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Category\", \"col\": 3}}, {\"id\": \"sp1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Setup</b></span>\", \"col\": 12}}, {\"id\": \"s5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tracker\", \"col\": 3}}, {\"id\": \"s6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account Group\", \"col\": 3}}, {\"id\": \"s7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Payment Method\", \"col\": 3}}, {\"id\": \"s8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Settings\", \"col\": 3}}, {\"id\": \"sp2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Ledger &amp; Reports</b></span>\", \"col\": 12}}, {\"id\": \"p1\", \"type\": \"paragraph\", \"data\": {\"text\": \"The ledger is ERPNext's. Every transaction posts a balanced Journal Entry, so these standard reports work directly on your data and can be filtered by Tracker.\", \"col\": 12}}, {\"id\": \"s9\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 3}}, {\"id\": \"s10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trial Balance\", \"col\": 3}}, {\"id\": \"s11\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Balance Sheet\", \"col\": 3}}, {\"id\": \"s12\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Profit and Loss Statement\", \"col\": 3}}, {\"id\": \"s13\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cash Flow\", \"col\": 3}}, {\"id\": \"s14\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 3}}]",
  "creation": "2026-07-16 17:53:19.250024",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,7 +12,7 @@
  "is_hidden": 0,
  "label": "Money Tracker",
  "links": [],
- "modified": "2026-07-16 17:53:19.250024",
+ "modified": "2026-08-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Money Tracker",
@@ -32,51 +32,93 @@
   },
   {
    "color": "Blue",
-   "doc_view": "",
+   "doc_view": "List",
    "label": "Transaction",
    "link_to": "Transaction",
    "type": "DocType"
   },
   {
    "color": "Orange",
-   "doc_view": "",
+   "doc_view": "List",
    "label": "Money Account",
    "link_to": "Money Account",
    "type": "DocType"
   },
   {
    "color": "Yellow",
-   "doc_view": "",
+   "doc_view": "Tree",
    "label": "Category",
    "link_to": "Category",
    "type": "DocType"
   },
   {
    "color": "Grey",
-   "doc_view": "",
+   "doc_view": "List",
    "label": "Tracker",
    "link_to": "Tracker",
    "type": "DocType"
   },
   {
    "color": "Grey",
-   "doc_view": "",
-   "label": "Ledger Account",
-   "link_to": "Ledger Account",
+   "doc_view": "Tree",
+   "label": "Money Account Group",
+   "link_to": "Money Account Group",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Money Payment Method",
+   "link_to": "Money Payment Method",
    "type": "DocType"
   },
   {
    "color": "Grey",
    "doc_view": "",
-   "label": "Money Journal Entry",
-   "link_to": "Money Journal Entry",
+   "label": "Money Settings",
+   "link_to": "Money Settings",
    "type": "DocType"
   },
   {
    "color": "Grey",
    "doc_view": "",
-   "label": "Money GL Entry",
-   "link_to": "Money GL Entry",
+   "label": "General Ledger",
+   "link_to": "General Ledger",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "label": "Trial Balance",
+   "link_to": "Trial Balance",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "label": "Balance Sheet",
+   "link_to": "Balance Sheet",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "label": "Profit and Loss Statement",
+   "link_to": "Profit and Loss Statement",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "label": "Cash Flow",
+   "link_to": "Cash Flow",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Journal Entry",
+   "link_to": "Journal Entry",
    "type": "DocType"
   }
  ],

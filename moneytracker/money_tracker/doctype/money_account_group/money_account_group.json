@@ -3,58 +3,47 @@
  "allow_import": 1,
  "allow_rename": 1,
  "autoname": "hash",
- "creation": "2026-07-16 15:23:17.292707",
+ "creation": "2026-08-08 10:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "category_name",
-  "category_type",
-  "tracker",
-  "parent_category",
+  "group_name",
+  "group_type",
+  "parent_money_account_group",
   "is_group",
   "column_break_main",
   "icon",
   "color",
-  "is_active",
-  "budget_eligible",
-  "ledger_account",
+  "sort_order",
   "lft",
   "rgt",
   "old_parent"
  ],
  "fields": [
   {
-   "fieldname": "category_name",
+   "fieldname": "group_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Category Name",
+   "label": "Group Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Determines which side of the net-worth calculation members of this group fall on.",
+   "fieldname": "group_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Group Type",
+   "options": "Asset\nLiability",
    "reqd": 1
   },
   {
-   "description": "Income and expense categories are kept separate and can never be mixed on one transaction.",
-   "fieldname": "category_type",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Category Type",
-   "options": "Income\nExpense",
-   "reqd": 1,
-   "search_index": 1
-  },
-  {
-   "fieldname": "tracker",
-   "fieldtype": "Link",
-   "label": "Tracker",
-   "options": "Tracker",
-   "search_index": 1
-  },
-  {
-   "description": "Subcategories are ordinary Categories with a parent, so the hierarchy can go as deep as needed.",
-   "fieldname": "parent_category",
+   "fieldname": "parent_money_account_group",
    "fieldtype": "Link",
    "ignore_user_permissions": 1,
-   "label": "Parent Category",
-   "options": "Category"
+   "label": "Parent Money Account Group",
+   "options": "Money Account Group"
   },
   {
    "default": "0",
@@ -77,25 +66,10 @@
    "label": "Color"
   },
   {
-   "default": "1",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
-  },
-  {
-   "default": "1",
-   "description": "Whether a Budget can be set against this category.",
-   "fieldname": "budget_eligible",
-   "fieldtype": "Check",
-   "label": "Budget Eligible"
-  },
-  {
-   "description": "The ERPNext Account this maps to. Created automatically.",
-   "fieldname": "ledger_account",
-   "fieldtype": "Link",
-   "label": "Ledger Account",
-   "options": "Account",
-   "read_only": 1
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
   },
   {
    "fieldname": "lft",
@@ -123,7 +97,7 @@
    "hidden": 1,
    "label": "Old Parent",
    "no_copy": 1,
-   "options": "Category",
+   "options": "Money Account Group",
    "print_hide": 1,
    "read_only": 1
   }
@@ -135,8 +109,8 @@
  "modified": "2026-08-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
- "name": "Category",
- "nsm_parent_field": "parent_category",
+ "name": "Money Account Group",
+ "nsm_parent_field": "parent_money_account_group",
  "owner": "Administrator",
  "permissions": [
   {
@@ -159,15 +133,14 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Finance User",
+   "role": "Finance Admin",
    "share": 1,
    "write": 1
   },
   {
-   "export": 1,
    "read": 1,
    "report": 1,
-   "role": "Finance Viewer"
+   "role": "Finance User"
   }
  ],
  "row_format": "Dynamic",
@@ -176,5 +149,5 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "category_name"
+ "title_field": "group_name"
 }
