@@ -4,13 +4,14 @@
 """Dashboard and balance API (spec §5, §70)."""
 
 import frappe
-from frappe.utils import flt, fmt_money, get_first_day, get_last_day, today
+from frappe.utils import add_to_date, flt, fmt_money, get_first_day, get_last_day, getdate, today
 
 from moneytracker.money_tracker.services import (
 	balances,
 	categories,
 	coa,
 	settings as settings_service,
+	trends,
 )
 
 
@@ -65,6 +66,28 @@ def get_spending_by_category(tracker=None, category_type="Expense", from_date=No
 	}
 
 
+@frappe.whitelist()
+def get_trend(tracker=None, from_date=None, to_date=None, interval="Monthly"):
+	"""Income and net expense per period — the same series the dashboard charts draw.
+
+	Whitelisted separately from the Dashboard Chart Source so a client that is not Desk can
+	ask for the numbers without going through the chart widget's argument shape.
+	"""
+	tracker = tracker or settings_service.get_default_tracker()
+	frappe.has_permission("Tracker", doc=tracker, throw=True)
+
+	to_date = to_date or today()
+	from_date = from_date or add_to_date(to_date, years=-1)
+
+	return {
+		"tracker": tracker,
+		"interval": interval,
+		"period": {"from_date": getdate(from_date), "to_date": getdate(to_date)},
+		"currency": settings_service.get_base_currency(),
+		"rows": trends.get_period_series(tracker, from_date, to_date, interval),
+	}
+
+
 def _total_balance(account_rows):
 	"""What the tracker's asset accounts hold, from rows of get_balances_for_tracker.
 
@@ -77,22 +100,18 @@ def _total_balance(account_rows):
 
 
 def _period_totals(tracker, from_date, to_date):
-	"""Income and expense for a period, from the Transaction ledger in one grouped query."""
-	rows = frappe.get_all(
-		"Transaction",
-		filters={
-			"tracker": tracker,
-			"docstatus": 1,
-			"date": ["between", [from_date, to_date]],
-			"transaction_type": ["in", ["Income", "Expense", "Refund"]],
-		},
-		fields=["transaction_type", "SUM(base_amount) as total"],
-		group_by="transaction_type",
+	"""Income and net expense for a period — the cards' figures, totalled over the series.
+
+	Deliberately not its own query. The §62 rule that a Refund *reduces* spend rather than
+	adding income was written out here as well as in `trends.get_period_series`, and a rule
+	stated in two places is a rule that eventually disagrees with itself. The chart series is
+	the one implementation; a card is that series summed.
+	"""
+	rows = trends.get_period_series(tracker, from_date, to_date)
+	return (
+		flt(sum(row["income"] for row in rows)),
+		flt(sum(row["expense"] for row in rows)),
 	)
-	totals = {r.transaction_type: flt(r.total) for r in rows}
-	# A refund reduces spend rather than adding income (§62).
-	expense = totals.get("Expense", 0.0) - totals.get("Refund", 0.0)
-	return totals.get("Income", 0.0), expense
 
 
 @frappe.whitelist()
@@ -168,12 +187,12 @@ def get_dashboard(tracker=None, as_of=None):
 CARD_NO_DATA = "—"
 
 
-def _card_filters(filters=None):
-	"""Normalise a Number Card's filters to a dict.
+def parse_widget_filters(filters=None):
+	"""Normalise a dashboard widget's filters to a dict.
 
-	They arrive as whatever `filters_json` parsed to. These cards ship with an object, but
-	Desk's filter editor writes `[[doctype, fieldname, operator, value], ...]` if someone
-	edits one in the UI, so accept that too.
+	They arrive as whatever `filters_json` parsed to. The shipped cards and charts carry an
+	object, but Desk's filter editor writes `[[doctype, fieldname, operator, value], ...]`
+	if someone edits one in the UI, so accept that too.
 	"""
 	if isinstance(filters, str):
 		filters = frappe.parse_json(filters)
@@ -184,27 +203,24 @@ def _card_filters(filters=None):
 	return {}
 
 
-def _card_context(filters=None):
-	"""Return `(tracker, as_of)` for a card, with tracker None if the user has none.
+def resolve_widget_tracker(filters):
+	"""The tracker a card or chart should paint, or None if the user has none.
 
-	Deliberately not `settings_service.get_default_tracker()`: that creates a Tracker on
-	first use, and merely rendering a dashboard must not write one into existence.
+	A widget is scoped to exactly one tracker: `filters.tracker` when the widget names one —
+	permission-checked, since a shared Company means the Tracker *is* the isolation — and
+	otherwise the session user's own.
 	"""
-	filters = _card_filters(filters)
-	as_of = filters.get("as_of") or today()
-
 	tracker = filters.get("tracker")
 	if tracker:
 		frappe.has_permission("Tracker", doc=tracker, throw=True)
-		return tracker, as_of
+		return tracker
+	return settings_service.find_tracker()
 
-	tracker = frappe.db.get_value(
-		"Tracker",
-		{"owner_user": frappe.session.user, "is_archived": 0},
-		"name",
-		order_by="creation asc",
-	)
-	return tracker, as_of
+
+def _card_context(filters=None):
+	"""Return `(tracker, as_of)` for a card, with tracker None if the user has none."""
+	filters = parse_widget_filters(filters)
+	return resolve_widget_tracker(filters), filters.get("as_of") or today()
 
 
 def _card_currency(tracker):

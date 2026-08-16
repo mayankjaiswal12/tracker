@@ -29,7 +29,7 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 1. On **Transaction** and **Money Account**, `tracker` and `currency` are mandatory with no
    default. The controllers fill them server-side, but Desk's client-side check fires first,
-   so **you must pick them by hand in the form.** The `Add Transaction` page (step 9) does
+   so **you must pick them by hand in the form.** The `Add Transaction` page (step 10) does
    not have this problem.
 2. `Journal Entry`, `Ledger Account` and `Current Balance` are read-only and are written
    *after* submit. Reload the form (`Ctrl+R`) to see them populate.
@@ -184,7 +184,54 @@ shown positive because it is what you *owe*.
 
 ---
 
-## 7. The ledger underneath
+## 7. The dashboard
+
+**Money Tracker** in the sidebar. Everything below reads the same six transactions you just
+posted, so the numbers are the ones from step 6 seen a different way.
+
+> The widgets are scoped to **one tracker** — `filters.tracker` if the widget names one,
+> otherwise *your own* tracker. If you have more than one, expect the cards to show the
+> first one you created, not `Desk Test`. To pin them, open the card or chart's filter and
+> set Tracker.
+
+### The five Number Cards
+
+| Card | Expected | Why |
+|---|---|---|
+| Total Balance | **47,500** | assets only: 39,500 + 8,000. The 2,000 card debt is *not* added |
+| Net Worth | **45,500** | 47,500 − 2,000 owed |
+| Income This Month | **50,000** | |
+| Expenses This Month | **4,500** | 2,000 + 3,000 − 500 refund |
+| Savings Rate | **91.0%** | (50,000 − 4,500) / 50,000 |
+
+✅ **The key check:** Total Balance is 47,500, not 49,500. Every account is reported in its
+natural direction, so the credit card's 2,000 comes back positive; adding it in would show
+you *more* money the more you charged to the card.
+
+✅ Each figure carries the **tracker's** currency symbol, because the card renders the
+string server-side rather than handing the browser a bare number.
+
+### The two charts
+
+Both are `Custom` charts fed by the `Money Period Totals` source, monthly, last year.
+
+- **Income vs Expense** (bar) — two series. This month: Income 50,000, Expense 4,500.
+- **Spending Trend** (line) — the expense series alone.
+
+✅ Thirteen labels, ending on the current month, even though only one month has any money
+in it. An empty month is a period at zero, not a missing point.
+
+✅ The transfer and the credit card payment appear in **neither** series — they moved money
+without earning or spending it.
+
+✅ Click the funnel on a chart → **Tracker** and **Series** filters, no doctype filter
+fields. Set Series to `Income` and the bar chart drops to one series.
+
+✅ Change **Monthly → Daily** in the chart's own toolbar: the money lands on today's date.
+
+---
+
+## 8. The ledger underneath
 
 **Money Tracker → Journal Entry** — six entries, all **Submitted**.
 
@@ -205,7 +252,7 @@ that is what makes net Food spend read correctly instead of inflating both sides
 
 ---
 
-## 8. Reports (the payoff)
+## 9. Reports (the payoff)
 
 Every report below is **ERPNext's**, with a **Tracker** filter that exists only because
 `Tracker` is registered as an Accounting Dimension. There is no reporting code in this app.
@@ -252,7 +299,7 @@ Renders without error for `2026-2027`.
 
 ---
 
-## 9. The Add Transaction page
+## 10. The Add Transaction page
 
 **Money Tracker → Add Transaction** (custom page, not a DocType form).
 
@@ -272,7 +319,7 @@ Switch Type to **Transfer**: the Category field hides and Destination Account ap
 
 ---
 
-## 10. Cancel and reversal
+## 11. Cancel and reversal
 
 Open the **2,000 Expense** (#2). Menu → **Cancel**.
 
@@ -297,7 +344,7 @@ ledger entries."*
 
 ---
 
-## 11. Row-level security (the important one)
+## 12. Row-level security (the important one)
 
 All books share one ERPNext Company, so `permissions.py` is the **only** thing separating
 users. Test it for real, not by reading code.
@@ -330,7 +377,7 @@ they see *only* those.
 
 ---
 
-## 12. Cleanup (optional)
+## 13. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
