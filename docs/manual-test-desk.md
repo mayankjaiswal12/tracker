@@ -36,8 +36,14 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 ### Existing data
 
-Tracker **Verify Ledger** and its `VL *` accounts are left over from the automated
-verification. Ignore them — this run creates its own `DT *` set so the numbers stay clean.
+Tracker **Demo Household** and its four accounts are the demo data
+(`money_tracker/demo.py`), seeded 2026-08-16: 67 transactions over 2026-04-01 … 2026-08-15,
+which is what the workspace cards and charts show. Ignore it for the posting steps — this
+run creates its own `DT *` set so the numbers stay clean — and use it in §7, where the point
+is that the widgets read a populated tracker.
+
+The old `Verify Ledger` / `VL *` data this document used to mention was deleted on
+2026-08-16, along with the user `vl.other@example.com`; the demo replaced it.
 
 ---
 
@@ -190,9 +196,14 @@ shown positive because it is what you *owe*.
 posted, so the numbers are the ones from step 6 seen a different way.
 
 > The widgets are scoped to **one tracker** — `filters.tracker` if the widget names one,
-> otherwise *your own* tracker. If you have more than one, expect the cards to show the
-> first one you created, not `Desk Test`. To pin them, open the card or chart's filter and
-> set Tracker.
+> otherwise *your own* tracker, and with more than one that is the **earliest** you created.
+> On `tracker.localhost` that is `Demo Household`, not `Desk Test`. To see the table below,
+> open each card and chart's filter and set Tracker to `Desk Test`.
+>
+> Unfiltered, against the demo household, the cards read **Total Balance 3,32,550 · Net
+> Worth 2,61,755 · Income This Month 1,20,000 · Expenses This Month 67,899 · Savings Rate
+> 43.4%** (verified 2026-08-16). The current month is deliberately part-finished — the
+> seeder skips future-dated rows — so those two month figures grow as the month does.
 
 ### The five Number Cards
 
@@ -290,8 +301,8 @@ DT Bank **39,500**, DT SBI **8,000**, DT Card **2,000** — matching step 6 exac
 
 ### General Ledger
 
-Filter by Tracker `Desk Test`: six vouchers. Clear the Tracker filter and the `VL *` rows
-from the automated run appear too — proving the filter is doing real work.
+Filter by Tracker `Desk Test`: six vouchers. Clear the Tracker filter and the demo
+household's rows appear too — proving the filter is doing real work.
 
 ### Cash Flow
 
@@ -366,7 +377,7 @@ users. Test it for real, not by reading code.
 | Tracker list | **empty** |
 | Paste a TXN URL from your Administrator session | **Not permitted** |
 
-❌ **If even one row of `Desk Test` or `Verify Ledger` data is visible, that is a security
+❌ **If even one row of `Desk Test` or `Demo Household` data is visible, that is a security
 bug — stop and report it.**
 
 > Why empty rather than an error: `tracker_scoped_query_conditions` returns `1 = 0` for a
