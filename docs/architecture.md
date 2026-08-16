@@ -178,10 +178,13 @@ moneytracker/money_tracker/
     coa.py          provisions ERPNext Accounts
     balances.py     balances and net worth, derived from GL Entry
     categories.py   the default category tree and roll-up totals
+    trends.py       per-period income and expense series, behind both charts
     settings.py     accessors for Money Settings
     fx.py           currency conversion, over ERPNext's Currency Exchange
   api/              whitelisted endpoints, incl. the dashboard number cards
   number_card/      the five shipped Number Card fixtures
+  dashboard_chart/  the two shipped charts, over one Dashboard Chart Source
+  demo.py           the demo household — seed and teardown, bench execute only
   permissions.py    row-level security — the only user isolation there is
   workspace/        the Desk workspace
 moneytracker/tests/ cross-cutting suite (doctype rules live beside their controllers)
@@ -192,16 +195,19 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is migrated, verified and covered by **185 tests**
+Phase 1 is complete, verified and covered by **234 tests**
 (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
 | **5** | posting strategies implemented, of fourteen declared types |
 | **5** | dashboard Number Cards — total balance, net worth, income, expenses, savings rate |
+| **2** | Dashboard Charts — income vs expense, spending trend — over one shared source |
 | **38** | categories seeded for a new tracker, as a two-level tree |
 
-Next: Dashboard Charts (spending trend, income vs expense), then demo fixtures. The
-frontend is deliberately deferred — Phase 1 is the backend and Desk only.
+A demo household (`money_tracker/demo.py`, run from `bench execute`) seeds six months of
+deterministic transactions and removes them again, so the app can be shown in the state it
+is meant to be used in. The frontend is deliberately deferred — Phase 1 is the backend and
+Desk only; Phase 2 opens with per-tracker goals.
 
 See `CLAUDE.md` for working conventions and `task.md` for the current resume point.
