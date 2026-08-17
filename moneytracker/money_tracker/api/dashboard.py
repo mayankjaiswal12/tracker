@@ -102,16 +102,11 @@ def _total_balance(account_rows):
 def _period_totals(tracker, from_date, to_date):
 	"""Income and net expense for a period — the cards' figures, totalled over the series.
 
-	Deliberately not its own query. The §62 rule that a Refund *reduces* spend rather than
-	adding income was written out here as well as in `trends.get_period_series`, and a rule
-	stated in two places is a rule that eventually disagrees with itself. The chart series is
-	the one implementation; a card is that series summed.
+	Deliberately not its own query, and now not even its own summation: `trends.get_totals`
+	is the one place the §62 refund rule is applied to a window, so a card, a goal and a
+	chart cannot drift apart.
 	"""
-	rows = trends.get_period_series(tracker, from_date, to_date)
-	return (
-		flt(sum(row["income"] for row in rows)),
-		flt(sum(row["expense"] for row in rows)),
-	)
+	return trends.get_totals(tracker, from_date, to_date)
 
 
 @frappe.whitelist()

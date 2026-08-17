@@ -26,6 +26,7 @@ from frappe import _
 from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day, getdate, today
 
 from moneytracker.money_tracker.services import balances
+from moneytracker.money_tracker.services import goals as goals_service
 from moneytracker.money_tracker.services import settings as settings_service
 
 # Written into the tracker's description. `clear_demo_data` refuses to touch a tracker
@@ -263,6 +264,92 @@ ONE_OFFS = {
 }
 
 
+# One goal of every implemented type, so the Goals section of the workspace has something to
+# draw and every measure in `services/goals.py` can be seen working on real figures.
+#
+# `window` names the dates rather than fixing them, because the demo has to make sense
+# whenever it is run: "month" is the calendar month in progress, "year" runs from the oldest
+# seeded month, "horizon" is a target far enough out to still be unmet, and "recent" is a goal
+# taken up this month with a long deadline.
+#
+# Accounts and categories are named, not linked, and resolved against this tracker — same
+# rule as the transaction plan above, so a rename in DEFAULT_CATEGORIES fails loudly.
+DEMO_GOALS = (
+	{
+		"goal_name": "Emergency Fund",
+		"goal_type": "Savings",
+		"target_amount": 300000,
+		"target_account": "Emergency Fund",
+		# The account exists for this goal alone, so everything in it counts towards it.
+		"measure_basis": "Account Balance",
+		"window": "horizon",
+		"color": "#29cd42",
+		"notes": "Six months of expenses, kept somewhere boring.",
+	},
+	{
+		"goal_name": "Japan Trip",
+		"goal_type": "Savings",
+		"target_amount": 200000,
+		"target_account": "HDFC Bank",
+		# The other basis: money is saved in the account the salary lands in, so only what has
+		# gone in since the goal started counts, plus what was already put aside for it.
+		"measure_basis": "Contributions Since Start",
+		"opening_amount": 25000,
+		"category": "Travel",
+		# "recent", not "horizon": a goal on the account the salary lands in, backdated to the
+		# start of the ledger, measures the account's entire growth and reads as achieved without
+		# anyone having saved for a trip. Starting it this month is both how a person would
+		# actually set it up and what makes the difference from Account Balance visible.
+		"window": "recent",
+		"color": "#7cd6fd",
+	},
+	{
+		"goal_name": "Clear the Credit Card",
+		"goal_type": "Debt Payoff",
+		"target_amount": 50000,
+		"target_account": "HDFC Credit Card",
+		# Declared rather than read from the ledger, because this household's card debt *grows*
+		# over the seeded months — they buy a laptop on it — so "cleared since the goal started"
+		# would be negative every time. A card carried in from before the books begin is the
+		# ordinary case anyway, and it is the only demo goal that shows this field being used.
+		"opening_amount": 100000,
+		"window": "year",
+		"color": "#ff5858",
+		"notes": "Card balance carried in from before this ledger starts.",
+	},
+	{
+		"goal_name": "Dining Out Budget",
+		"goal_type": "Spending Limit",
+		"target_amount": 5000,
+		"category": "Restaurants",
+		"window": "month",
+		"color": "#ffa00a",
+	},
+	{
+		"goal_name": "Freelance Income",
+		"goal_type": "Income Target",
+		"target_amount": 100000,
+		"category": "Business & Freelance",
+		"window": "year",
+		"color": "#4463f0",
+	},
+	{
+		"goal_name": "Save 30% of Income",
+		"goal_type": "Savings Rate Target",
+		"target_percent": 30,
+		"window": "month",
+		"color": "#743ee2",
+	},
+	{
+		"goal_name": "First 10 Lakh",
+		"goal_type": "Net Worth Target",
+		"target_amount": 1000000,
+		"window": "horizon",
+		"color": "#28a3af",
+	},
+)
+
+
 # --- setup -------------------------------------------------------------------------------
 
 
@@ -307,7 +394,11 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 			else:
 				skipped += 1
 
-	return _summary(tracker, tracker_name, period, posted, skipped)
+	# After the transactions, not before: a goal is measured from the ledger, so seeding one
+	# against an empty tracker would only be visible once something had been posted anyway.
+	goals = _create_goals(tracker, accounts, period)
+
+	return _summary(tracker, tracker_name, period, posted, skipped, goals)
 
 
 def _create_tracker(user, tracker_name):
@@ -343,6 +434,67 @@ def _create_accounts(tracker, groups):
 		doc.insert(ignore_permissions=True)
 		accounts[account_name] = doc.name
 	return accounts
+
+
+def _create_goals(tracker, accounts, period):
+	"""Create the demo goals. Returns their names, oldest first."""
+	created = []
+	for row in DEMO_GOALS:
+		start_date, target_date = _goal_window(row["window"], period)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Goal",
+				"tracker": tracker,
+				"goal_name": row["goal_name"],
+				"goal_type": row["goal_type"],
+				"target_amount": row.get("target_amount"),
+				"target_percent": row.get("target_percent"),
+				"target_account": accounts.get(row.get("target_account")),
+				"category": _goal_category(tracker, row) if row.get("category") else None,
+				"measure_basis": row.get("measure_basis"),
+				"opening_amount": row.get("opening_amount"),
+				"start_date": start_date,
+				"target_date": target_date,
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+	return created
+
+
+def _goal_window(window, period):
+	"""`(start_date, target_date)` for a named window. See DEMO_GOALS."""
+	horizon = getdate(get_last_day(add_months(today(), 18)))
+	if window == "month":
+		return getdate(get_first_day(today())), getdate(get_last_day(today()))
+	if window == "year":
+		return period[0], getdate(get_last_day(add_months(period[0], 11)))
+	if window == "recent":
+		return getdate(get_first_day(today())), horizon
+	return period[0], horizon
+
+
+def _goal_category(tracker, row):
+	"""Resolve a goal's category by name, whichever side of the books it is on.
+
+	Unlike a transaction, a goal's category type is not implied by anything else on the row —
+	an Income Target names an income category and every other type names an expense one.
+	"""
+	category_type = "Income" if row["goal_type"] == "Income Target" else "Expense"
+	name = frappe.db.get_value(
+		"Category",
+		{"tracker": tracker, "category_name": row["category"], "category_type": category_type},
+		"name",
+	)
+	if not name:
+		frappe.throw(
+			_("Demo goal {0} names a {1} category {2} that the default tree does not have.").format(
+				frappe.bold(row["goal_name"]), category_type, frappe.bold(row["category"])
+			)
+		)
+	return name
 
 
 def _seed_account_groups():
@@ -457,10 +609,11 @@ def _covered_by_a_fiscal_year(date):
 	)
 
 
-def _summary(tracker, tracker_name, period, posted, skipped):
+def _summary(tracker, tracker_name, period, posted, skipped, goal_names):
 	currency = frappe.db.get_value("Tracker", tracker, "base_currency")
 	rows = balances.get_balances_for_tracker(tracker)
 	net_worth = balances.get_net_worth(tracker)
+	measured = goals_service.measure_goals(tracker)
 
 	summary = {
 		"tracker": tracker,
@@ -471,13 +624,17 @@ def _summary(tracker, tracker_name, period, posted, skipped):
 		"currency": currency,
 		"balances": {row["account_name"]: flt(row["balance"]) for row in rows},
 		"net_worth": flt(net_worth["net_worth"]),
+		"goals": {row.goal_name: (row.progress_percent, row.outcome) for row in measured},
 	}
 
-	print(f"\nDemo tracker {tracker} ({tracker_name}) — {posted} transactions")
+	print(f"\nDemo tracker {tracker} ({tracker_name}) — {posted} transactions, {len(goal_names)} goals")
 	print(f"  months   {summary['months'][0]} … {summary['months'][-1]}")
 	for account_name, balance in summary["balances"].items():
 		print(f"  {account_name:<20} {fmt_money(balance, currency=currency)}")
 	print(f"  {'net worth':<20} {fmt_money(summary['net_worth'], currency=currency)}")
+	for goal_name, (percent, outcome) in summary["goals"].items():
+		figure = "—" if percent is None else f"{percent}%"
+		print(f"  {goal_name:<24} {figure:>8}  {outcome}")
 
 	# The dashboard cards fall back to the user's *earliest* tracker, not the newest one.
 	owner = frappe.db.get_value("Tracker", tracker, "owner_user")
@@ -540,6 +697,9 @@ def clear_demo_data(tracker=None, tracker_name=None):
 		frappe.db.delete("Journal Entry", {"name": ["in", journal_entries]})
 	frappe.db.delete("Transaction", {"tracker": tracker})
 
+	# Goals before accounts and categories: a goal links to both, and deleting the account
+	# out from under one would leave a dangling link for the seconds until it too went.
+	removed["goals"] = _delete_all("Money Goal", {"tracker": tracker})
 	removed["money_accounts"] = _delete_all("Money Account", {"tracker": tracker})
 	removed["categories"] = _delete_categories(tracker)
 	frappe.delete_doc("Tracker", tracker, ignore_permissions=True, force=True)

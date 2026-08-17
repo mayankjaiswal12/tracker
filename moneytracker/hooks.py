@@ -127,6 +127,7 @@ permission_query_conditions = {
 	"Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 }
 
 has_permission = {
@@ -134,6 +135,7 @@ has_permission = {
 	"Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 }
 
 # DocType Class

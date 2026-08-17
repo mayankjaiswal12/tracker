@@ -117,6 +117,25 @@ def make_transaction(transaction_type, amount, account, submit=True, **kwargs):
 	return doc
 
 
+def make_goal(tracker=None, **kwargs):
+	"""A goal on `tracker`. Savings by default, so a target account has to be passed with it.
+
+	`target_amount` is filled for every type except the one measured in percent, where it is
+	`target_percent` that carries the number and a target amount is refused.
+	"""
+	kwargs.setdefault("goal_name", unique("Goal"))
+	kwargs.setdefault("goal_type", "Savings")
+	kwargs.setdefault("start_date", posting_date())
+	if kwargs["goal_type"] == "Savings Rate Target":
+		kwargs.setdefault("target_percent", 30)
+	else:
+		kwargs.setdefault("target_amount", 100000)
+
+	doc = frappe.get_doc({"doctype": "Money Goal", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_user(roles=("Finance User",)):
 	"""A user with only the restricted roles, so the permission hooks actually apply."""
 	email = f"mt-{frappe.generate_hash(length=8)}@example.com"

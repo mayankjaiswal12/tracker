@@ -74,3 +74,18 @@ def get_period_series(tracker, from_date, to_date, interval="Monthly"):
 		}
 		for period_end in period_ends
 	]
+
+
+def get_totals(tracker, from_date, to_date):
+	"""Income and net expense over one window as `(income, expense)`.
+
+	The series summed rather than a query of its own. The §62 rule that a Refund *reduces*
+	spend was briefly written out once per widget, and a rule stated twice is a rule that
+	eventually disagrees with itself — the Number Cards, the goals and anything else asking
+	"what did this period come to?" all end up here.
+	"""
+	rows = get_period_series(tracker, from_date, to_date)
+	return (
+		flt(sum(row["income"] for row in rows)),
+		flt(sum(row["expense"] for row in rows)),
+	)

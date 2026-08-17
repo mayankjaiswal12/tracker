@@ -1,9 +1,10 @@
 # Manual test run — Desk
 
-A click-through pass over everything Phase 1 implements. Every number below is
-pre-computed, so you are checking arithmetic, not recomputing it.
+A click-through pass over everything Phase 1 implements, plus the goals that opened Phase 2
+(§13). Every number below is pre-computed and was verified against the ledger — 2026-08-16
+for §1–§12, 2026-08-17 for §13 — so you are checking arithmetic, not recomputing it.
 
-Roughly 20 minutes. Nothing here needs the terminal except the two optional cross-checks.
+Roughly 30 minutes. Nothing here needs the terminal except the two optional cross-checks.
 
 ---
 
@@ -72,8 +73,10 @@ The old `Verify Ledger` / `VL *` data this document used to mention was deleted 
 | Owner User | `Administrator` |
 | Base Currency | `INR` |
 
-Save. Note the URL ends in a **hash**, not "Desk Test" — accounts are named by hash so two
-users can both have a "Cash" account. The list still shows the readable title.
+Save. Note the URL ends in **`TRK-0000x`**, not "Desk Test" — trackers, accounts, categories
+and goals are named by series so two users can both have a "Cash" account. The list still
+shows the readable title. (They were named by *hash* until 2026-08-15; this document said so
+until 2026-08-17.)
 
 ---
 
@@ -119,13 +122,22 @@ Reload each and confirm `Ledger Account`: `DT Food - T` under **Direct Expenses 
 ### Tree behaviour
 
 1. Add a child under `DT Food`: name `DT Groceries`, type `Expense`, tracker `Desk Test`.
-   ✅ It nests under DT Food in the tree and gets its own ledger account.
+   ✅ Expected refusal first: *"Category DT Food is not a group. Tick Is Group on it before
+   nesting anything under it."* Tick **Is Group** on `DT Food`, save, and add the child again.
+   ✅ It nests under DT Food in the tree and gets its own ledger account, `DT Groceries - T`.
+   ✅ Reload `DT Food`: its **Ledger Account is now empty**. A heading holds no money — and
+   the old account is *dropped*, never deleted, because another tracker's Food category may
+   be sharing it.
+   ✅ From here on, **`DT Food` cannot be posted to**: it is a heading, and §5 files spending
+   under `DT Groceries` instead. Try an Expense against `DT Food` if you want to see it
+   refused — *"DT Food is a group category. Post to one of its sub-categories instead."*
 2. Add a child under `DT Food` with type **`Income`**.
    ✅ Expected refusal: *"A Income category cannot sit under the Expense category … Income
    and expense trees are separate."*
 
-> Known cosmetic defect: that message prints the parent's name **hash** instead of
-> "DT Food". Logged in `task.md`.
+> That message used to print the parent's name **hash**; it was fixed on 2026-08-12 in the
+> ID-consistency pass, so it should now read "DT Food". If you see a hash, that is a
+> regression.
 
 ---
 
@@ -140,11 +152,11 @@ anything outside it throws. Set Tracker `Desk Test` and Currency `INR` every tim
 | # | Type | Amount | Account | Destination | Category |
 |---|---|---|---|---|---|
 | 1 | Income | 50000 | DT Bank | — | DT Salary |
-| 2 | Expense | 2000 | DT Bank | — | DT Food |
-| 3 | Expense | 3000 | DT Card | — | DT Food |
+| 2 | Expense | 2000 | DT Bank | — | DT Groceries |
+| 3 | Expense | 3000 | DT Card | — | DT Groceries |
 | 4 | Transfer | 8000 | DT Bank | DT SBI | *(hides itself)* |
 | 5 | Credit Card Payment | 1000 | DT Bank | DT Card | *(hides itself)* |
-| 6 | Refund | 500 | DT Bank | — | DT Food |
+| 6 | Refund | 500 | DT Bank | — | DT Groceries |
 
 Notes as you go:
 
@@ -202,10 +214,10 @@ posted, so the numbers are the ones from step 6 seen a different way.
 >
 > Unfiltered, against the demo household, the cards read **Total Balance 3,32,550 · Net
 > Worth 2,61,755 · Income This Month 1,20,000 · Expenses This Month 67,899 · Savings Rate
-> 43.4%** (verified 2026-08-16). The current month is deliberately part-finished — the
+> 43.4% · Goals on Track 6 of 7** (verified 2026-08-16, goals 2026-08-17). The current month is deliberately part-finished — the
 > seeder skips future-dated rows — so those two month figures grow as the month does.
 
-### The five Number Cards
+### The Number Cards
 
 | Card | Expected | Why |
 |---|---|---|
@@ -214,6 +226,7 @@ posted, so the numbers are the ones from step 6 seen a different way.
 | Income This Month | **50,000** | |
 | Expenses This Month | **4,500** | 2,000 + 3,000 − 500 refund |
 | Savings Rate | **91.0%** | (50,000 − 4,500) / 50,000 |
+| Goals on Track | **—** | no goals yet; §13 builds them and this becomes **5 of 6** |
 
 ✅ **The key check:** Total Balance is 47,500, not 49,500. Every account is reported in its
 natural direction, so the credit card's 2,000 comes back positive; adding it in would show
@@ -222,9 +235,11 @@ you *more* money the more you charged to the card.
 ✅ Each figure carries the **tracker's** currency symbol, because the card renders the
 string server-side rather than handing the browser a bare number.
 
-### The two charts
+### The charts
 
-Both are `Custom` charts fed by the `Money Period Totals` source, monthly, last year.
+Income vs Expense and Spending Trend are `Custom` charts fed by the `Money Period Totals`
+source, monthly, last year. The third, **Goal Progress**, has its own source and is covered
+in §13.
 
 - **Income vs Expense** (bar) — two series. This month: Income 50,000, Expense 4,500.
 - **Spending Trend** (line) — the expense series alone.
@@ -258,7 +273,7 @@ Open the Transfer one:
 touches an income or expense account.** A settlement between balance-sheet accounts can
 never show up as spending.
 
-✅ Open the Refund: it **credits `DT Food - T`**. It does not touch any income account —
+✅ Open the Refund: it **credits `DT Groceries - T`**. It does not touch any income account —
 that is what makes net Food spend read correctly instead of inflating both sides.
 
 ---
@@ -279,7 +294,7 @@ Balance Sheet, P&L and Cash Flow also want **From Fiscal Year** and **To Fiscal 
 | DT Bank - T | 50,500 | 11,000 |
 | DT SBI - T | 8,000 | 0 |
 | DT Card - T | 1,000 | 3,000 |
-| DT Food - T | 5,000 | 500 |
+| DT Groceries - T | 5,000 | 500 |
 | DT Salary - T | 0 | 50,000 |
 | **Total** | **64,500** | **64,500** |
 
@@ -290,7 +305,8 @@ Balance Sheet, P&L and Cash Flow also want **From Fiscal Year** and **To Fiscal 
 | Line | Expected |
 |---|---|
 | DT Salary (income) | **50,000** |
-| DT Food (expense) | **4,500** (2000 + 3000 − 500 refund) |
+| DT Groceries (expense) | **4,500** (2000 + 3000 − 500 refund) |
+| DT Food | **absent** — a group holds no ledger account, so ERPNext lists only the leaf |
 | DT Bank / DT SBI / DT Card | **must not appear at all** |
 
 ✅ The transfer and the card payment are invisible here. That is the whole design.
@@ -314,10 +330,12 @@ Renders without error for `2026-2027`.
 
 **Money Tracker → Add Transaction** (custom page, not a DocType form).
 
-Post an Expense: amount `250`, account `DT Bank`, category `DT Food`.
+Post an Expense: amount `250`, account `DT Bank`, category `DT Groceries`.
 
 ✅ Expected: green toast *"Transaction TXN-000xx posted"*, form resets, and **DT Bank drops
-to 39,250** with **DT Food** rising to 4,750.
+to 39,250** with **DT Groceries** rising to 4,750.
+
+✅ `DT Food` is not offered in the category list — the page filters group categories out.
 
 Switch Type to **Transfer**: the Category field hides and Destination Account appears.
 
@@ -341,7 +359,7 @@ Open the **2,000 Expense** (#2). Menu → **Cancel**.
 | Transaction | **Cancelled** |
 | Its Journal Entry | **Cancelled** — not deleted |
 | DT Bank balance | **41,500** (39,500 + 2,000 back) |
-| P&L → DT Food | **2,500** (4,500 − 2,000) |
+| P&L → DT Groceries | **2,500** (4,500 − 2,000) |
 | Journal Entry → **GL Entry** for that voucher | **4 rows**, all `is_cancelled = 1` — the 2 originals plus 2 reversing rows, netting to zero |
 
 ✅ History is preserved. Nothing was erased.
@@ -388,14 +406,155 @@ they see *only* those.
 
 ---
 
-## 13. Cleanup (optional)
+## 13. Goals
+
+**Money Tracker → Money Goal → + Add Money Goal.** Six goals over the same six
+transactions, one of every type. A goal stores **no progress** — every figure below is
+measured from the ledger each time you open the form, so none of it can go stale.
+
+Set **Tracker `Desk Test`** on each one. Use **Start Date `2026-08-12`** throughout — the
+same date the transactions carry — and where a Target Date is given, `2026-08-12` as well.
+
+> Why a Target Date in the past: it makes every outcome below **date-independent**. A window
+> that has closed is judged on its final figure, so these words read the same whenever you
+> run this pass. Live goals in the demo household are the other case — §7.
+
+Create them in this order:
+
+| # | Goal Name | Type | Target | Dates | Other fields |
+|---|---|---|---|---|---|
+| 1 | `DT Food Cap` | Spending Limit | 5000 | 08-12 → 08-12 | Category `DT Food` |
+| 2 | `DT Keep 30` | Savings Rate Target | 30% | 08-12 → 08-12 | — |
+| 3 | `DT Earn 60k` | Income Target | 60000 | 08-12 → 08-12 | Category `DT Salary` |
+| 4 | `DT SBI Pot` | Savings | 20000 | 08-12, no deadline | Account `DT SBI`, basis `Account Balance` |
+| 5 | `DT Card Payoff` | Debt Payoff | 3000 | 08-12, no deadline | Account `DT Card`, Opening `3000` |
+| 6 | `DT First Lakh` | Net Worth Target | 100000 | 08-12, no deadline | — |
+
+Watch the form as you pick each type: **the fields change**. Target Amount becomes Target
+Percent for the rate goal, Target Account appears only for Savings and Debt Payoff, Measure
+Basis only for Savings, and the **Category description rewrites itself** — "what is measured"
+for #1 and #3, "what this goal is for" for the rest.
+
+### The progress bar
+
+Reload each saved goal. The **Progress** block at the top of the form:
+
+| Goal | Progress | Outcome | Footnote reads |
+|---|---|---|---|
+| DT Food Cap | **90%** | Achieved | 4,500 of 5,000 spent · 500 left · deadline passed |
+| DT Keep 30 | **303.33%** | Achieved | 91.0% of 30.0% · deadline passed |
+| DT Earn 60k | **83.33%** | **Missed** | 50,000 of 60,000 · 10,000 to go · deadline passed |
+| DT SBI Pot | **40%** | In Progress | 8,000 of 20,000 · 12,000 to go |
+| DT Card Payoff | **33.33%** | In Progress | 1,000 of 3,000 · 2,000 to go |
+| DT First Lakh | **45.5%** | In Progress | 45,500 of 1,00,000 · 54,500 to go |
+
+✅ **DT Food Cap is 4,500, not 5,000.** Two things had to work: the 500 refund **reduced**
+the spend (§62), and `DT Food` is a **group**, so the 2,000 and 3,000 filed under it and its
+child rolled up. A group is deliberately allowed here — the opposite of a Transaction, which
+refuses to post to a heading.
+
+✅ **The transfer and the card payment appear in no goal's spend.** They moved money.
+
+✅ **DT Card Payoff reads 1,000 cleared** — 3,000 declared as the opening, 2,000 still owed.
+Now blank the Opening Amount and save: it drops to **−2,000, an empty bar**. That is correct
+and worth understanding — with no opening declared it is read from the ledger as at 11 Aug,
+when nothing was owed yet, so the card was *charged* inside the window rather than paid down.
+Put the 3,000 back.
+
+✅ **DT First Lakh's 45,500 is the Net Worth card's figure**, arrived at independently.
+
+✅ Each money figure carries the **tracker's** currency symbol — formatted server-side, like
+the cards.
+
+✅ **The tick mark on the bar** is where the goal should have been by now. `DT Food Cap` and
+`DT Earn 60k` have one, at the far right — their window is over, so 100% of it should have
+been done. The three undated goals have **no tick and no "days left"**: there is no pace to
+be behind when no date was ever set, which is why they read *In Progress* rather than
+*Behind*. **`DT Keep 30` has no tick either**, despite having a deadline — a rate does not
+accumulate, so being at 91% halfway through a window says nothing about where it "should"
+be. That is the `cumulative` flag in `GOAL_TYPES` doing its job.
+
+### Breaching a limit
+
+Open `DT Food Cap`, change Target Amount to **4000**, save, reload.
+
+✅ **Breached**, bar red, footnote *"4,500 of 4,000 spent · −500 over"*. A limit that goes
+over stays breached for that window — the money is already spent. Compare `DT Earn 60k`,
+which is only *Missed* because its window closed short.
+
+Set it back to **5000**.
+
+### The link fields are filtered
+
+- New Savings goal → open **Target Account**: `DT Bank` and `DT SBI` only. **`DT Card` is
+  not offered.** Switch the type to Debt Payoff → now `DT Card` **only**.
+- `DT SBI` from another tracker is not offered either — the list is scoped to `Desk Test`.
+- Spending Limit → **Category** offers `DT Food` and `DT Groceries`, not `DT Salary`.
+  Income Target → the reverse.
+
+### The refusals
+
+Each is caught on **Save**, not Submit — a goal is not submittable.
+
+- **Saving into a credit card:** Savings goal, account `DT Card`.
+  ✅ *"DT Card is a debt, not somewhere to save. Use a Debt Payoff goal for it instead."*
+- **Paying off a bank account:** Debt Payoff, account `DT Bank`.
+  ✅ *"DT Bank is not a debt. A Debt Payoff is set against a credit card or a loan."*
+- **A limit on an income category:** Spending Limit, category `DT Salary`.
+  ✅ *"DT Salary is a Income category. A Spending Limit is measured over Expense categories."*
+- **A limit with no deadline:** leave Target Date empty.
+  ✅ *"A Spending Limit needs a Target Date — it measures a period, and a period has to end."*
+- **A deadline before the start:** Target Date `2026-08-01`.
+  ✅ *"Target Date cannot be before Start Date."*
+- **A duplicate name:** a second goal called `DT Food Cap` on `Desk Test`.
+  ✅ *"A goal named DT Food Cap already exists on this tracker."* The same name on another
+  tracker is fine — names are unique per tracker, as with accounts and categories.
+- **Zero target:** ✅ *"Target Amount must be greater than zero."*
+- **A rate over 100:** Savings Rate Target, 120.
+  ✅ *"Target Percent must be greater than 0 and no more than 100."*
+
+### Retyping clears what the new type cannot use
+
+Open `DT SBI Pot`, change **Goal Type** to `Net Worth Target`, save, reload.
+
+✅ Target Account, Measure Basis and Opening Amount are **empty** — a stale link to an
+account the new type never reads would show up in every report that joins on it. Change it
+back to Savings and set `DT SBI` / `Account Balance` again.
+
+### The dashboard, again
+
+Back to **Money Tracker**, with every widget's Tracker filter still on `Desk Test`:
+
+✅ **Goals on Track** reads **5 of 6** — every goal except `DT Earn 60k`. Achieved, On Track
+and In Progress all count as going well; Missed, Behind, At Risk and Breached do not.
+
+✅ **Goal Progress** draws **six bars**, one per goal, in the order *DT Food Cap · DT Keep 30
+· DT Earn 60k · DT SBI Pot · DT Card Payoff · DT First Lakh* — soonest deadline first, and
+undated goals last, because a deadline is what makes a goal urgent.
+
+✅ Bar heights are the percentages from the table above; `DT Keep 30` runs off the top at
+303%, which is honest — it is three times the target rate.
+
+✅ Click the funnel: **Tracker**, **Status** and **Goal Type** filters. Set Goal Type to
+`Savings` → **one bar**, `DT SBI Pot`. The payoff is a different type, and blank means every type.
+
+✅ Set `DT First Lakh`'s **Status** to `Paused` and reload the workspace: the card reads
+**4 of 5** and the chart drops to five bars. A paused goal is still a goal — it is just not
+what the dashboard is counting. Set it back to `Active`.
+
+---
+
+## 14. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
-2. Delete `DT Groceries`, `DT Food`, `DT Salary`.
-3. Delete `DT Bank`, `DT SBI`, `DT Card`.
-4. Delete tracker `Desk Test`, and user `dt.other@example.com`.
+2. Delete the six `DT *` goals from §13 — a goal is not submittable, so it just deletes.
+3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
+4. Delete `DT Bank`, `DT SBI`, `DT Card`.
+5. Delete tracker `Desk Test`, and user `dt.other@example.com`.
+
+Goals before accounts and categories: a goal links to both.
 
 Two things deliberately survive and are safe to leave:
 
@@ -413,3 +572,8 @@ Two things deliberately survive and are safe to leave:
 - Overdraft blocking — `Money Settings.allow_negative_balance` defaults to `1`, so
   `check_sufficient_balance()` is currently a no-op. To test it, untick that box, then try
   spending more than `DT Bank` holds.
+- A goal measured **while its window is still open** — §13 uses closed windows on purpose, so
+  its outcomes read the same whenever you run it. The demo household's goals are the live
+  case: open any of them from §7 and the pace marker sits mid-bar.
+- `Money Goal`'s `Archived` status, and a Savings goal on the `Contributions Since Start`
+  basis — §13's pot uses `Account Balance`. Both are covered by the automated suite.

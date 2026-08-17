@@ -15,9 +15,11 @@ then out again leaving nothing behind.
 from contextlib import contextmanager
 
 import frappe
+from frappe.utils import get_first_day, getdate, today
 
 from moneytracker.money_tracker import demo
 from moneytracker.money_tracker.posting import strategies
+from moneytracker.money_tracker.services import coa, goals
 from moneytracker.money_tracker.services.categories import DEFAULT_CATEGORIES
 from moneytracker.tests.utils import MoneyTrackerTestCase, unique
 
@@ -153,6 +155,90 @@ class TestDemoPlan(MoneyTrackerTestCase):
 
 		self.assertGreater(net["HDFC Bank"], 0, "the bank should be ahead at the end of a month")
 		self.assertGreater(net["Wallet"], 0, "the wallet is topped up by more than it spends")
+
+
+class TestDemoGoals(MoneyTrackerTestCase):
+	"""The goal plan, checked the same way as the transaction plan: as data.
+
+	A demo goal names an account, a category and a goal type, and every one of those can rot
+	without anything failing until somebody looks at the workspace and sees an empty chart.
+	"""
+
+	def test_every_goal_uses_an_implemented_type(self):
+		for row in demo.DEMO_GOALS:
+			with self.subTest(goal=row["goal_name"]):
+				self.assertIn(row["goal_type"], goals.GOAL_TYPES)
+
+	def test_the_plan_shows_every_measure_at_least_once(self):
+		"""The point of the demo set: each measure in GOAL_TYPES visible on the workspace."""
+		self.assertEqual(
+			{row["goal_type"] for row in demo.DEMO_GOALS}, set(goals.GOAL_TYPE_OPTIONS)
+		)
+
+	def test_every_goal_names_an_account_the_demo_creates(self):
+		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
+
+		for row in demo.DEMO_GOALS:
+			if row.get("target_account"):
+				with self.subTest(goal=row["goal_name"]):
+					self.assertIn(row["target_account"], created)
+
+	def test_a_goal_names_an_account_of_the_side_its_type_needs(self):
+		"""A Savings goal on a credit card, or a Debt Payoff on a bank, is refused on save."""
+		for row in demo.DEMO_GOALS:
+			spec = goals.GOAL_TYPES[row["goal_type"]]
+			if not spec.account:
+				with self.subTest(goal=row["goal_name"]):
+					self.assertIsNone(row.get("target_account"))
+				continue
+
+			with self.subTest(goal=row["goal_name"]):
+				account_type = ACCOUNT_TYPES[row["target_account"]]
+				self.assertEqual(coa.is_liability(account_type), spec.account == "Liability")
+
+	def test_every_goal_names_a_category_the_default_tree_seeds(self):
+		"""Same rule as the transactions — except a goal may name a *group*, since a limit on
+		one rolls up its children."""
+		leaves = seeded_categories()
+		groups = {
+			label
+			for category_type, entries in DEFAULT_CATEGORIES.items()
+			for label, children in entries
+			if children
+		}
+
+		for row in demo.DEMO_GOALS:
+			if not row.get("category"):
+				continue
+			category_type = "Income" if row["goal_type"] == "Income Target" else "Expense"
+			with self.subTest(goal=row["goal_name"]):
+				self.assertIn(row["category"], leaves[category_type] | groups)
+
+	def test_a_goal_carries_the_target_field_its_unit_needs(self):
+		"""A percentage goal is refused a target amount and vice versa."""
+		for row in demo.DEMO_GOALS:
+			spec = goals.GOAL_TYPES[row["goal_type"]]
+			with self.subTest(goal=row["goal_name"]):
+				if spec.unit == goals.PERCENT:
+					self.assertTrue(0 < row.get("target_percent", 0) <= 100)
+				else:
+					self.assertGreater(row.get("target_amount", 0), 0)
+
+	def test_every_window_is_one_the_planner_knows(self):
+		self.assertEqual(
+			{row["window"] for row in demo.DEMO_GOALS} - {"month", "year", "horizon", "recent"}, set()
+		)
+
+	def test_a_period_goal_gets_a_window_that_ends(self):
+		"""`needs_deadline` types are refused without a target date, and every named window
+		here supplies one — but a window keyed wrong would only fail when the demo is run."""
+		period = [getdate(get_first_day(today()))]
+
+		for row in demo.DEMO_GOALS:
+			with self.subTest(goal=row["goal_name"]):
+				start_date, target_date = demo._goal_window(row["window"], period)
+				self.assertTrue(target_date)
+				self.assertGreaterEqual(target_date, start_date)
 
 
 class TestDemoRefusals(MoneyTrackerTestCase):
