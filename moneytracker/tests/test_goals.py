@@ -719,9 +719,9 @@ class TestGoalWidgets(MoneyTrackerTestCase):
 
 	def test_the_shipped_chart_draws_through_its_own_name(self):
 		"""The path the widget actually takes: chart name in, labels and datasets out."""
-		self.assertTrue(frappe.db.exists("Dashboard Chart", "Money Goal Progress"))
+		self.assertTrue(frappe.db.exists("Dashboard Chart", "Goal Progress"))
 
-		result = goal_chart.get(chart_name="Money Goal Progress", filters={"tracker": self.tracker})
+		result = goal_chart.get(chart_name="Goal Progress", filters={"tracker": self.tracker})
 		self.assertEqual(result["labels"], [self.met.goal_name, self.behind.goal_name])
 
 

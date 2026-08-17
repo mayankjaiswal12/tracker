@@ -465,13 +465,13 @@ class TestShippedChartFixtures(MoneyTrackerTestCase):
 		"""Spending Trend is one series *because of* its filters_json. Passing a tracker and
 		nothing else used to replace that wholesale and quietly draw income back onto it.
 		"""
-		result = source.get(chart_name="Money Spending Trend", filters={"tracker": make_tracker().name})
+		result = source.get(chart_name="Spending Trend", filters={"tracker": make_tracker().name})
 
 		self.assertEqual([d["name"] for d in result["datasets"]], ["Expense"])
 
 	def test_an_explicit_series_still_overrides_the_saved_one(self):
 		result = source.get(
-			chart_name="Money Spending Trend",
+			chart_name="Spending Trend",
 			filters={"tracker": make_tracker().name, "series": "Income"},
 		)
 
@@ -479,14 +479,14 @@ class TestShippedChartFixtures(MoneyTrackerTestCase):
 
 	def test_a_shipped_chart_draws_through_its_own_name(self):
 		"""The path the widget takes: chart name in, labels and datasets out."""
-		self.assertTrue(frappe.db.exists("Dashboard Chart", "Money Income vs Expense"))
+		self.assertTrue(frappe.db.exists("Dashboard Chart", "Income vs Expense"))
 
 		tracker = make_tracker().name
 		account = make_account(tracker, account_type="Bank").name
 		category = make_category(tracker, category_type="Income").name
 		make_transaction("Income", 1234, account, tracker=tracker, category=category)
 
-		result = source.get(chart_name="Money Income vs Expense", filters={"tracker": tracker})
+		result = source.get(chart_name="Income vs Expense", filters={"tracker": tracker})
 
 		self.assertEqual([d["name"] for d in result["datasets"]], ["Income", "Expense"])
 		self.assertMoneyEqual(result["datasets"][0]["values"][-1], 1234)
