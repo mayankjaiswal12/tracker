@@ -1,0 +1,248 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "GOL-.#####",
+ "creation": "2026-08-17 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "progress_section",
+  "progress_html",
+  "basics_section",
+  "goal_name",
+  "goal_type",
+  "tracker",
+  "status",
+  "column_break_basics",
+  "category",
+  "color",
+  "icon",
+  "target_section",
+  "target_amount",
+  "target_percent",
+  "currency",
+  "column_break_target",
+  "start_date",
+  "target_date",
+  "measurement_section",
+  "target_account",
+  "measure_basis",
+  "column_break_measurement",
+  "opening_amount",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "progress_html",
+   "fieldtype": "HTML",
+   "label": "Progress"
+  },
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "goal_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Goal Name",
+   "reqd": 1
+  },
+  {
+   "default": "Savings",
+   "description": "What the goal measures. Progress is always derived from the ledger, never stored.",
+   "fieldname": "goal_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Goal Type",
+   "options": "Savings\nNet Worth Target\nIncome Target\nSavings Rate Target\nSpending Limit\nDebt Payoff",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "Active",
+   "description": "Whether the goal is being pursued. Achieved and Missed are worked out from the ledger, so they are not choices here.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nPaused\nArchived",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "For a Spending Limit or an Income Target this is what is measured, including everything filed under it; leave it empty to cover the whole tracker. For the other types it says what the goal is for.",
+   "fieldname": "category",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "Category"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "target_section",
+   "fieldtype": "Section Break",
+   "label": "Target"
+  },
+  {
+   "depends_on": "eval:doc.goal_type != \"Savings Rate Target\"",
+   "fieldname": "target_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Target Amount",
+   "mandatory_depends_on": "eval:doc.goal_type != \"Savings Rate Target\"",
+   "options": "currency"
+  },
+  {
+   "depends_on": "eval:doc.goal_type == \"Savings Rate Target\"",
+   "description": "Share of income to keep, between 0 and 100.",
+   "fieldname": "target_percent",
+   "fieldtype": "Percent",
+   "label": "Target Percent",
+   "mandatory_depends_on": "eval:doc.goal_type == \"Savings Rate Target\""
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_target",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "description": "Progress is measured from this date onwards.",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "description": "The deadline. Required where the goal is about a period rather than a balance.",
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Target Date"
+  },
+  {
+   "depends_on": "eval:[\"Savings\", \"Debt Payoff\"].includes(doc.goal_type)",
+   "fieldname": "measurement_section",
+   "fieldtype": "Section Break",
+   "label": "Measurement"
+  },
+  {
+   "depends_on": "eval:[\"Savings\", \"Debt Payoff\"].includes(doc.goal_type)",
+   "description": "The account the money is saved in, or the debt being paid off.",
+   "fieldname": "target_account",
+   "fieldtype": "Link",
+   "label": "Target Account",
+   "mandatory_depends_on": "eval:[\"Savings\", \"Debt Payoff\"].includes(doc.goal_type)",
+   "options": "Money Account"
+  },
+  {
+   "default": "Contributions Since Start",
+   "depends_on": "eval:doc.goal_type == \"Savings\"",
+   "description": "Contributions Since Start counts only what has gone in since the start date. Account Balance counts everything the account holds, which suits a pot kept for this goal alone.",
+   "fieldname": "measure_basis",
+   "fieldtype": "Select",
+   "label": "Measure Basis",
+   "options": "Contributions Since Start\nAccount Balance"
+  },
+  {
+   "fieldname": "column_break_measurement",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.goal_type == \"Debt Payoff\" || (doc.goal_type == \"Savings\" && doc.measure_basis != \"Account Balance\")",
+   "description": "For a Savings goal, money already put aside before the start date — including money saved outside this app. For a Debt Payoff, what was owed when the goal started; left empty it is read from the ledger.",
+   "fieldname": "opening_amount",
+   "fieldtype": "Currency",
+   "label": "Opening Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Goal",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "goal_name"
+}

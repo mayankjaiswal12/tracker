@@ -4,9 +4,15 @@
 """Dashboard and balance API (spec §5, §70)."""
 
 import frappe
-from frappe.utils import flt, get_first_day, get_last_day, today
+from frappe.utils import add_to_date, flt, fmt_money, get_first_day, get_last_day, getdate, today
 
-from moneytracker.money_tracker.services import balances, settings as settings_service
+from moneytracker.money_tracker.services import (
+	balances,
+	categories,
+	coa,
+	settings as settings_service,
+	trends,
+)
 
 
 @frappe.whitelist()
@@ -37,23 +43,70 @@ def recompute_balances(tracker=None):
 	return {"updated": balances.recompute_balances(tracker=tracker)}
 
 
+@frappe.whitelist()
+def get_spending_by_category(tracker=None, category_type="Expense", from_date=None, to_date=None):
+	"""The category tree with roll-up totals — the heading total ERPNext's reports don't give.
+
+	Every leaf category has its own flat ledger account, so a P&L lists Groceries and
+	Restaurants side by side with no "Food" line. This adds it up over the tree instead.
+	"""
+	tracker = tracker or settings_service.get_default_tracker()
+	frappe.has_permission("Tracker", doc=tracker, throw=True)
+
+	if not (from_date and to_date):
+		reference = to_date or from_date or today()
+		from_date, to_date = get_first_day(reference), get_last_day(reference)
+
+	return {
+		"tracker": tracker,
+		"category_type": category_type,
+		"period": {"from_date": from_date, "to_date": to_date},
+		"currency": settings_service.get_base_currency(),
+		"rows": categories.get_category_totals(tracker, category_type, from_date, to_date),
+	}
+
+
+@frappe.whitelist()
+def get_trend(tracker=None, from_date=None, to_date=None, interval="Monthly"):
+	"""Income and net expense per period — the same series the dashboard charts draw.
+
+	Whitelisted separately from the Dashboard Chart Source so a client that is not Desk can
+	ask for the numbers without going through the chart widget's argument shape.
+	"""
+	tracker = tracker or settings_service.get_default_tracker()
+	frappe.has_permission("Tracker", doc=tracker, throw=True)
+
+	to_date = to_date or today()
+	from_date = from_date or add_to_date(to_date, years=-1)
+
+	return {
+		"tracker": tracker,
+		"interval": interval,
+		"period": {"from_date": getdate(from_date), "to_date": getdate(to_date)},
+		"currency": settings_service.get_base_currency(),
+		"rows": trends.get_period_series(tracker, from_date, to_date, interval),
+	}
+
+
+def _total_balance(account_rows):
+	"""What the tracker's asset accounts hold, from rows of get_balances_for_tracker.
+
+	Liabilities are excluded rather than added in: every account is reported in its own
+	natural direction, so a credit card with 1,500 owed on it comes back as +1,500, and
+	summing that would add a debt to the money you have. Debt belongs to net worth, which
+	subtracts it.
+	"""
+	return sum(row["balance"] for row in account_rows if not coa.is_liability(row["account_type"]))
+
+
 def _period_totals(tracker, from_date, to_date):
-	"""Income and expense for a period, from the Transaction ledger in one grouped query."""
-	rows = frappe.get_all(
-		"Transaction",
-		filters={
-			"tracker": tracker,
-			"docstatus": 1,
-			"date": ["between", [from_date, to_date]],
-			"transaction_type": ["in", ["Income", "Expense", "Refund"]],
-		},
-		fields=["transaction_type", "SUM(base_amount) as total"],
-		group_by="transaction_type",
-	)
-	totals = {r.transaction_type: flt(r.total) for r in rows}
-	# A refund reduces spend rather than adding income (§62).
-	expense = totals.get("Expense", 0.0) - totals.get("Refund", 0.0)
-	return totals.get("Income", 0.0), expense
+	"""Income and net expense for a period — the cards' figures, totalled over the series.
+
+	Deliberately not its own query, and now not even its own summation: `trends.get_totals`
+	is the one place the §62 refund rule is applied to a window, so a card, a goal and a
+	chart cannot drift apart.
+	"""
+	return trends.get_totals(tracker, from_date, to_date)
 
 
 @frappe.whitelist()
@@ -68,6 +121,7 @@ def get_dashboard(tracker=None, as_of=None):
 	income, expense = _period_totals(tracker, month_start, month_end)
 	net_worth = balances.get_net_worth(tracker, as_of)
 	savings = income - expense
+	account_rows = balances.get_balances_for_tracker(tracker, as_of)
 
 	return {
 		"tracker": tracker,
@@ -75,9 +129,7 @@ def get_dashboard(tracker=None, as_of=None):
 		"currency": settings_service.get_base_currency(),
 		"as_of": as_of,
 		"period": {"from_date": month_start, "to_date": month_end},
-		"total_balance": sum(
-			row["balance"] for row in balances.get_balances_for_tracker(tracker, as_of)
-		),
+		"total_balance": _total_balance(account_rows),
 		"assets": net_worth["assets"],
 		"liabilities": net_worth["liabilities"],
 		"net_worth": net_worth["net_worth"],
@@ -85,7 +137,7 @@ def get_dashboard(tracker=None, as_of=None):
 		"monthly_expense": expense,
 		"monthly_savings": savings,
 		"savings_rate": (savings / income * 100) if income else 0.0,
-		"accounts": balances.get_balances_for_tracker(tracker, as_of),
+		"accounts": account_rows,
 		"recent_transactions": frappe.get_all(
 			"Transaction",
 			filters={"tracker": tracker, "docstatus": 1},
@@ -107,3 +159,117 @@ def get_dashboard(tracker=None, as_of=None):
 			limit_page_length=10,
 		),
 	}
+
+
+# ---------------------------------------------------------------------------
+# Number Card sources (spec §5)
+#
+# The cards are `type: "Custom"` rather than Frappe's built-in "Document Type"
+# aggregation, for three reasons that are not stylistic:
+#   * balances come from GL Entry, and no Sum over Transaction reproduces them;
+#   * net expense has to subtract Refunds (§62), which one filter set cannot express;
+#   * every figure is scoped to a single Tracker, where a built-in card would sum every
+#     tracker the user is allowed to read.
+#
+# A Custom card calls its method with `{"filters": <parsed filters_json>}` and, when the
+# return value is a string, prints it verbatim. So the figures are formatted here rather
+# than in the browser: the card widget's own currency formatting falls back to System
+# Settings' currency, which is not necessarily the tracker's.
+# ---------------------------------------------------------------------------
+
+# Shown when the user has no tracker yet, or when a rate has no denominator. An empty
+# string would render as a blank card that looks broken rather than empty.
+CARD_NO_DATA = "—"
+
+
+def parse_widget_filters(filters=None):
+	"""Normalise a dashboard widget's filters to a dict.
+
+	They arrive as whatever `filters_json` parsed to. The shipped cards and charts carry an
+	object, but Desk's filter editor writes `[[doctype, fieldname, operator, value], ...]`
+	if someone edits one in the UI, so accept that too.
+	"""
+	if isinstance(filters, str):
+		filters = frappe.parse_json(filters)
+	if isinstance(filters, dict):
+		return filters
+	if isinstance(filters, list):
+		return {f[1]: f[3] for f in filters if len(f) == 4 and f[2] == "="}
+	return {}
+
+
+def resolve_widget_tracker(filters):
+	"""The tracker a card or chart should paint, or None if the user has none.
+
+	A widget is scoped to exactly one tracker: `filters.tracker` when the widget names one —
+	permission-checked, since a shared Company means the Tracker *is* the isolation — and
+	otherwise the session user's own.
+	"""
+	tracker = filters.get("tracker")
+	if tracker:
+		frappe.has_permission("Tracker", doc=tracker, throw=True)
+		return tracker
+	return settings_service.find_tracker()
+
+
+def _card_context(filters=None):
+	"""Return `(tracker, as_of)` for a card, with tracker None if the user has none."""
+	filters = parse_widget_filters(filters)
+	return resolve_widget_tracker(filters), filters.get("as_of") or today()
+
+
+def _card_currency(tracker):
+	return frappe.db.get_value("Tracker", tracker, "base_currency") or settings_service.get_base_currency()
+
+
+def _card_money(value, tracker):
+	return fmt_money(flt(value), currency=_card_currency(tracker))
+
+
+@frappe.whitelist()
+def card_total_balance(filters=None):
+	"""What the tracker's asset accounts hold right now."""
+	tracker, as_of = _card_context(filters)
+	if not tracker:
+		return CARD_NO_DATA
+	return _card_money(_total_balance(balances.get_balances_for_tracker(tracker, as_of)), tracker)
+
+
+@frappe.whitelist()
+def card_net_worth(filters=None):
+	"""Assets minus liabilities, over the accounts flagged include_in_net_worth (§31)."""
+	tracker, as_of = _card_context(filters)
+	if not tracker:
+		return CARD_NO_DATA
+	return _card_money(balances.get_net_worth(tracker, as_of)["net_worth"], tracker)
+
+
+@frappe.whitelist()
+def card_monthly_income(filters=None):
+	tracker, as_of = _card_context(filters)
+	if not tracker:
+		return CARD_NO_DATA
+	income, _expense = _period_totals(tracker, get_first_day(as_of), get_last_day(as_of))
+	return _card_money(income, tracker)
+
+
+@frappe.whitelist()
+def card_monthly_expense(filters=None):
+	"""Spending this month, net of refunds — a refund reduces spend, it is not income."""
+	tracker, as_of = _card_context(filters)
+	if not tracker:
+		return CARD_NO_DATA
+	_income, expense = _period_totals(tracker, get_first_day(as_of), get_last_day(as_of))
+	return _card_money(expense, tracker)
+
+
+@frappe.whitelist()
+def card_savings_rate(filters=None):
+	"""Share of this month's income that was not spent. Undefined without income."""
+	tracker, as_of = _card_context(filters)
+	if not tracker:
+		return CARD_NO_DATA
+	income, expense = _period_totals(tracker, get_first_day(as_of), get_last_day(as_of))
+	if not income:
+		return CARD_NO_DATA
+	return f"{flt((income - expense) / income * 100, 1)}%"

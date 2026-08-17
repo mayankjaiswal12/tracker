@@ -46,6 +46,19 @@ def get_default_cost_center():
 	return cost_center
 
 
+def find_tracker(user=None):
+	"""The tracker to *display* for `user`, or None if they have none yet.
+
+	Deliberately not `get_default_tracker()`: that creates a Tracker on first use, and
+	painting a dashboard — a card, a chart, a read-only widget — must never write one into
+	existence. A user with no tracker gets an empty widget, not a new record.
+	"""
+	user = user or frappe.session.user
+	return frappe.db.get_value(
+		"Tracker", {"owner_user": user, "is_archived": 0}, "name", order_by="creation asc"
+	)
+
+
 def get_default_tracker(user=None):
 	"""Return the tracker a new record belongs to for `user`, creating one on first use.
 
