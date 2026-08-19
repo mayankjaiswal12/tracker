@@ -128,6 +128,7 @@ permission_query_conditions = {
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Budget": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 }
 
 has_permission = {
@@ -136,6 +137,7 @@ has_permission = {
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Budget": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 }
 
 # DocType Class
@@ -161,23 +163,15 @@ has_permission = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"moneytracker.tasks.all"
-# 	],
-# 	"daily": [
-# 		"moneytracker.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"moneytracker.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"moneytracker.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"moneytracker.tasks.monthly"
-# 	],
-# }
+# Once a day is the right cadence for a budget alert: an envelope is measured against a
+# period, and nobody needs to hear about the same month twice before lunch. The job is
+# idempotent anyway — it stamps each budget with the period and outcome it last announced,
+# so a second run on the same figures sends nothing.
+scheduler_events = {
+	"daily": [
+		"moneytracker.money_tracker.services.budgets.send_budget_alerts",
+	],
+}
 
 # Testing
 # -------

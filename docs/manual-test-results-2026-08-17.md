@@ -6,6 +6,11 @@ says what actually happened.
 **Status: in progress — one finding, found and fixed.** Tick as you go: `[ ]` → `[x]` for a
 pass, `[!]` for a finding, then write the finding up in the log below.
 
+> **Scope grew on 2026-08-19.** `Money Budget` landed on branch `feat/phase-2-budgets`, so the
+> walkthrough now has **§14 Budgets** and cleanup has moved to §15, and the workspace has a
+> seventh card (`Budgets on Track`) and a fourth chart (`Budget vs Actual`). The confirmed
+> figures below have been extended to match. Everything else in this file still stands.
+
 ---
 
 ## 0. Environment, as left for you
@@ -16,7 +21,7 @@ pass, `[!]` for a finding, then write the finding up in the log below.
 | Dev server | `bench start` running — Desk answered 200 at 16:41 |
 | URL | http://tracker.localhost:8100/app/money-tracker |
 | Login | `Administrator` |
-| Site data | `TRK-00002 Demo Household` — 67 transactions, 2026-04-01 … 2026-08-15, **and 7 goals** |
+| Site data | `TRK-00002 Demo Household` — 67 transactions, 2026-04-01 … 2026-08-15, **7 goals and 5 budgets** |
 | Migrate | run twice; the second was a no-op and rewrote no fixture JSON |
 | Suite | 339 tests green, ~25s |
 
@@ -46,6 +51,7 @@ which is exactly what a manual pass is for.
 | Expenses This Month | `₹ 67,899.00` |
 | Savings Rate | `43.4%` |
 | Goals on Track | `6 of 7` |
+| Budgets on Track | `3 of 5` *(added 2026-08-19)* |
 
 Cross-checks that hold: 2,51,300 + 76,850 + 4,400 = **3,32,550**; less the 70,795 owed on the
 card = **2,61,755**; and the category roll-up below sums to **67,899**.
@@ -57,6 +63,11 @@ card = **2,61,755**; and the category roll-up below sums to **67,899**.
 | Income vs Expense | 13, `Aug 2025` … `Aug 2026` | `Income`, `Expense` |
 | Spending Trend | 13, same | `Expense` only |
 | Goal Progress | 7, `Dining Out Budget` … `First 10 Lakh` | `Progress` |
+| Budget vs Actual | **4**, `Household Bills` `Groceries` `Fuel & Commute` `Eating Out` | `Budget`, `Spent` |
+
+`Budget vs Actual` shows four and not five on purpose: `Travel Fund` is a **Yearly** budget
+and the chart's `period` filter defaults to `Monthly`, because a weekly envelope drawn beside
+a yearly one invites a comparison that means nothing.
 
 Monthly values, Apr → Aug 2026 (the first eight months are zero — that is the point):
 
@@ -75,6 +86,32 @@ Monthly values, Apr → Aug 2026 (the first eight months are zero — that is th
 | Emergency Fund | Savings | 25.62% | On Track | 76,850 / 3,00,000 | 19.86% |
 | Japan Trip | Savings | 36.65% | On Track | 73,300 / 2,00,000 | 2.94% |
 | First 10 Lakh | Net Worth Target | 26.18% | On Track | 2,61,755 / 10,00,000 | 19.86% |
+
+### The five budgets
+
+Measured 2026-08-19. All five start with the ledger (2026-04-01) and never end.
+
+| Budget | Period | Amount | Available | Spent | Used | Outcome |
+|---|---|---|---|---|---|---|
+| Household Bills | Monthly | 45,000 | 45,000 | 38,200 | 84.89% | **Nearing Limit** |
+| Groceries | Monthly | 13,000 | 13,000 | 6,800 | 52.31% | Within Budget |
+| Fuel & Commute | Monthly | 4,000 | 4,000 | 4,500 | 112.5% | **Over Budget** |
+| Eating Out | Monthly | 3,000 | **5,400** | 2,400 | 44.44% | Within Budget |
+| Travel Fund | Yearly | 60,000 | 60,000 | 18,000 | 30.0% | Within Budget |
+
+✅ `Eating Out` is the only one with **Rollover** on: 3,000 an envelope, 600 left over in each
+of four finished months, so the period it is in has 5,400 to spend. It is the one budget to
+open in the browser if you only open one — the carried-in figure and the history strip are
+what a budget shows that a goal cannot.
+
+✅ `Household Bills` is set against a **group** category (Housing), so its 38,200 is rent plus
+utilities rolled up — the same roll-up the category table below shows.
+
+✅ `Groceries` reads 6,800 and not 12,000: the second grocery run of the month is dated the
+18th and the demo was seeded on the 17th, so it was skipped as future. That is the same reason
+Expenses This Month is 67,899 rather than a full month.
+
+---
 
 ### Balances and the category roll-up
 

@@ -1,0 +1,242 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "BGT-.#####",
+ "creation": "2026-08-19 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "progress_section",
+  "progress_html",
+  "basics_section",
+  "budget_name",
+  "period",
+  "tracker",
+  "status",
+  "column_break_basics",
+  "category",
+  "color",
+  "icon",
+  "envelope_section",
+  "budget_amount",
+  "currency",
+  "rollover",
+  "column_break_envelope",
+  "start_date",
+  "end_date",
+  "alerts_section",
+  "alert_threshold",
+  "notify_on_alert",
+  "column_break_alerts",
+  "last_alert",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "progress_html",
+   "fieldtype": "HTML",
+   "label": "This Period"
+  },
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "budget_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Budget Name",
+   "reqd": 1
+  },
+  {
+   "default": "Monthly",
+   "description": "How often the envelope refills. Periods follow the calendar, so a Monthly budget's month is the same month the dashboard counts.",
+   "fieldname": "period",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Period",
+   "options": "Weekly\nMonthly\nQuarterly\nYearly",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "Active",
+   "description": "Whether the budget is being kept to. Whether it is over is worked out from the ledger, so it is not a choice here.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nPaused\nArchived",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "What the envelope covers, including everything filed under it. Leave it empty to budget the tracker's whole spending.",
+   "fieldname": "category",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "Category"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "envelope_section",
+   "fieldtype": "Section Break",
+   "label": "Envelope"
+  },
+  {
+   "description": "What may be spent in one period.",
+   "fieldname": "budget_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Budget Amount",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "0",
+   "description": "Carry what is left of a period into the next one — and carry an overspend too, since an envelope that forgets last month is two budgets wearing one name.",
+   "fieldname": "rollover",
+   "fieldtype": "Check",
+   "label": "Roll Over Unspent Amount"
+  },
+  {
+   "fieldname": "column_break_envelope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "description": "Spending is counted from this date onwards. The period it falls in is not prorated.",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "description": "The last day the budget applies. Leave it empty and it repeats indefinitely.",
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date"
+  },
+  {
+   "fieldname": "alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Alerts"
+  },
+  {
+   "default": "80",
+   "description": "The share of the envelope at which the budget starts warning.",
+   "fieldname": "alert_threshold",
+   "fieldtype": "Percent",
+   "label": "Alert Threshold"
+  },
+  {
+   "default": "1",
+   "description": "Send a notification when the threshold is crossed, and again if the period goes over. Never more than once for the same change.",
+   "fieldname": "notify_on_alert",
+   "fieldtype": "Check",
+   "label": "Notify Me"
+  },
+  {
+   "fieldname": "column_break_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The period and outcome already notified. Bookkeeping about a message that was sent, not about the money.",
+   "fieldname": "last_alert",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Last Alert",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-19 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Budget",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "budget_name"
+}

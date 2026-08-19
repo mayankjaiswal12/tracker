@@ -18,7 +18,7 @@ from contextlib import contextmanager
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import flt, getdate, nowdate
+from frappe.utils import flt, get_first_day, getdate, nowdate
 
 from moneytracker.money_tracker.services import settings as settings_service
 
@@ -132,6 +132,23 @@ def make_goal(tracker=None, **kwargs):
 		kwargs.setdefault("target_amount", 100000)
 
 	doc = frappe.get_doc({"doctype": "Money Goal", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_budget(tracker=None, **kwargs):
+	"""An envelope on `tracker`. Monthly and 10,000 unless told otherwise.
+
+	`start_date` defaults to the *first day of the posting month* rather than to today, so a
+	budget made by a test already covers the transactions that test posts — a budget starting
+	today would measure from today and read zero however much had been spent this month.
+	"""
+	kwargs.setdefault("budget_name", unique("Budget"))
+	kwargs.setdefault("period", "Monthly")
+	kwargs.setdefault("budget_amount", 10000)
+	kwargs.setdefault("start_date", get_first_day(posting_date()))
+
+	doc = frappe.get_doc({"doctype": "Money Budget", "tracker": tracker, **kwargs})
 	doc.insert(ignore_permissions=True)
 	return doc
 

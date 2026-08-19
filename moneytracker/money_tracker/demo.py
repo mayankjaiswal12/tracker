@@ -26,6 +26,7 @@ from frappe import _
 from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day, getdate, today
 
 from moneytracker.money_tracker.services import balances
+from moneytracker.money_tracker.services import budgets as budgets_service
 from moneytracker.money_tracker.services import goals as goals_service
 from moneytracker.money_tracker.services import settings as settings_service
 
@@ -350,6 +351,64 @@ DEMO_GOALS = (
 )
 
 
+# The envelopes, all starting with the ledger so the earlier periods are there to look at —
+# a budget's whole point is that it has happened before, and a demo that starts today shows
+# an empty history strip and no rollover.
+#
+# The amounts are set against what this household actually spends each month (from MONTHLY
+# above) so that every outcome word in `services/budgets.py` appears at least once: comfortably
+# within, nearing the line, and one straightforwardly over.
+DEMO_BUDGETS = (
+	{
+		"budget_name": "Groceries",
+		"category": "Groceries",
+		"period": "Monthly",
+		# 12,000 goes on groceries in an ordinary month, so this one runs close all month
+		# without ever quite breaking — the case an alert threshold exists for.
+		"budget_amount": 13000,
+		"alert_threshold": 80,
+		"color": "#ffa00a",
+	},
+	{
+		"budget_name": "Eating Out",
+		"category": "Restaurants",
+		"period": "Monthly",
+		# 600 a month is left over and kept. The only demo budget with rollover on, so the
+		# carried-in figure on the form has something to show.
+		"budget_amount": 3000,
+		"rollover": 1,
+		"color": "#7cd6fd",
+	},
+	{
+		"budget_name": "Household Bills",
+		# A *group* category: rent, utilities and maintenance under one envelope, which is
+		# what a group budget is for and what a Transaction may never post to.
+		"category": "Housing",
+		"period": "Monthly",
+		"budget_amount": 45000,
+		"color": "#4463f0",
+	},
+	{
+		"budget_name": "Fuel & Commute",
+		"category": "Transport",
+		"period": "Monthly",
+		# Deliberately short of the 5,400 this household spends getting about, so the demo has
+		# one envelope that is honestly over and one red bar on the chart.
+		"budget_amount": 4000,
+		"color": "#ff5858",
+	},
+	{
+		"budget_name": "Travel Fund",
+		"category": "Travel",
+		# The one budget on another clock, so the chart's period filter has something to do.
+		"period": "Yearly",
+		"budget_amount": 60000,
+		"alert_threshold": 75,
+		"color": "#28a3af",
+	},
+)
+
+
 # --- setup -------------------------------------------------------------------------------
 
 
@@ -397,8 +456,9 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 	# After the transactions, not before: a goal is measured from the ledger, so seeding one
 	# against an empty tracker would only be visible once something had been posted anyway.
 	goals = _create_goals(tracker, accounts, period)
+	budgets = _create_budgets(tracker, period)
 
-	return _summary(tracker, tracker_name, period, posted, skipped, goals)
+	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets)
 
 
 def _create_tracker(user, tracker_name):
@@ -492,6 +552,51 @@ def _goal_category(tracker, row):
 		frappe.throw(
 			_("Demo goal {0} names a {1} category {2} that the default tree does not have.").format(
 				frappe.bold(row["goal_name"]), category_type, frappe.bold(row["category"])
+			)
+		)
+	return name
+
+
+def _create_budgets(tracker, period):
+	"""Create the demo budgets. Returns their names, in plan order.
+
+	Every one of them starts with the ledger and never ends, which is what a real envelope
+	looks like: it is the periods behind it that make a budget worth reading, and a budget
+	created today has none.
+	"""
+	created = []
+	for row in DEMO_BUDGETS:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Budget",
+				"tracker": tracker,
+				"budget_name": row["budget_name"],
+				"period": row["period"],
+				"budget_amount": row["budget_amount"],
+				"category": _budget_category(tracker, row),
+				"rollover": row.get("rollover", 0),
+				"alert_threshold": row.get("alert_threshold"),
+				"start_date": period[0],
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+	return created
+
+
+def _budget_category(tracker, row):
+	"""Resolve a budget's category by name. Always an expense — an envelope holds spending."""
+	name = frappe.db.get_value(
+		"Category",
+		{"tracker": tracker, "category_name": row["category"], "category_type": "Expense"},
+		"name",
+	)
+	if not name:
+		frappe.throw(
+			_("Demo budget {0} names an expense category {1} that the default tree does not have.").format(
+				frappe.bold(row["budget_name"]), frappe.bold(row["category"])
 			)
 		)
 	return name
@@ -609,11 +714,12 @@ def _covered_by_a_fiscal_year(date):
 	)
 
 
-def _summary(tracker, tracker_name, period, posted, skipped, goal_names):
+def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_names):
 	currency = frappe.db.get_value("Tracker", tracker, "base_currency")
 	rows = balances.get_balances_for_tracker(tracker)
 	net_worth = balances.get_net_worth(tracker)
 	measured = goals_service.measure_goals(tracker)
+	envelopes = budgets_service.measure_budgets(tracker)
 
 	summary = {
 		"tracker": tracker,
@@ -625,9 +731,13 @@ def _summary(tracker, tracker_name, period, posted, skipped, goal_names):
 		"balances": {row["account_name"]: flt(row["balance"]) for row in rows},
 		"net_worth": flt(net_worth["net_worth"]),
 		"goals": {row.goal_name: (row.progress_percent, row.outcome) for row in measured},
+		"budgets": {row.budget_name: (row.used_percent, row.outcome) for row in envelopes},
 	}
 
-	print(f"\nDemo tracker {tracker} ({tracker_name}) — {posted} transactions, {len(goal_names)} goals")
+	print(
+		f"\nDemo tracker {tracker} ({tracker_name}) — {posted} transactions, "
+		f"{len(goal_names)} goals, {len(budget_names)} budgets"
+	)
 	print(f"  months   {summary['months'][0]} … {summary['months'][-1]}")
 	for account_name, balance in summary["balances"].items():
 		print(f"  {account_name:<20} {fmt_money(balance, currency=currency)}")
@@ -635,6 +745,8 @@ def _summary(tracker, tracker_name, period, posted, skipped, goal_names):
 	for goal_name, (percent, outcome) in summary["goals"].items():
 		figure = "—" if percent is None else f"{percent}%"
 		print(f"  {goal_name:<24} {figure:>8}  {outcome}")
+	for budget_name, (percent, outcome) in summary["budgets"].items():
+		print(f"  {budget_name:<24} {percent:>7}%  {outcome}")
 
 	# The dashboard cards fall back to the user's *earliest* tracker, not the newest one.
 	owner = frappe.db.get_value("Tracker", tracker, "owner_user")
@@ -697,9 +809,10 @@ def clear_demo_data(tracker=None, tracker_name=None):
 		frappe.db.delete("Journal Entry", {"name": ["in", journal_entries]})
 	frappe.db.delete("Transaction", {"tracker": tracker})
 
-	# Goals before accounts and categories: a goal links to both, and deleting the account
-	# out from under one would leave a dangling link for the seconds until it too went.
+	# Goals and budgets before accounts and categories: they link to both, and deleting the
+	# account out from under one would leave a dangling link for the seconds until it too went.
 	removed["goals"] = _delete_all("Money Goal", {"tracker": tracker})
+	removed["budgets"] = _delete_all("Money Budget", {"tracker": tracker})
 	removed["money_accounts"] = _delete_all("Money Account", {"tracker": tracker})
 	removed["categories"] = _delete_categories(tracker)
 	frappe.delete_doc("Tracker", tracker, ignore_permissions=True, force=True)

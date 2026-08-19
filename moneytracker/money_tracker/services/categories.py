@@ -9,7 +9,23 @@ flat ERPNext Account, so ERPNext's own reports list the leaves side by side; the
 """
 
 import frappe
-from frappe.utils import flt
+from frappe.utils import flt, getdate
+
+# The transaction types that move money across an expense category. A Refund is one of them
+# and is the reason this list is not just "Expense": it gives spending back rather than
+# earning it, so it nets off the category it was originally spent on (§62).
+SPEND_TYPES = ("Expense", "Refund")
+
+
+def net_sign(transaction_type):
+	"""+1 for money going out, -1 for money coming back (§62).
+
+	Stated once, here, because it is the rule that decides what "spent" means everywhere —
+	the category roll-up, the spending trend, a Spending Limit goal and a budget envelope all
+	have to agree about it or the same month reads differently on two widgets.
+	"""
+	return -1 if transaction_type == "Refund" else 1
+
 
 # (group label, children). A group with no children is a leaf the user can post to.
 DEFAULT_CATEGORIES = {
@@ -111,10 +127,7 @@ def get_category_totals(tracker, category_type="Expense", from_date=None, to_dat
 
 	own = {}
 	for row in rows:
-		# A refund gives spending back rather than earning it, so it nets off the category it
-		# was originally spent on (§62).
-		sign = -1 if row.transaction_type == "Refund" else 1
-		own[row.category] = flt(own.get(row.category, 0.0)) + sign * flt(row.total)
+		own[row.category] = flt(own.get(row.category, 0.0)) + net_sign(row.transaction_type) * flt(row.total)
 
 	result = []
 	for category in categories:
@@ -130,3 +143,68 @@ def get_category_totals(tracker, category_type="Expense", from_date=None, to_dat
 			}
 		)
 	return result
+
+
+def get_net_spend_by_date(tracker, category=None, from_date=None, to_date=None):
+	"""Net spend per day over one category subtree, as `{date: amount}`.
+
+	The daily form of `get_category_totals`, for callers that have to slice the same money
+	into periods of their own — a budget envelope repeats, so it needs a month at a time out
+	of one query rather than one query per month.
+
+	`category` is rolled up over its `lft`/`rgt` bounds, so a budget set on Food covers
+	Groceries and Restaurants with it. **No category means the whole tracker's spending**,
+	including transactions filed under nothing at all — the same reading a Spending Limit
+	goal with no category takes.
+
+	Days with no spending are absent rather than zero; the caller is bucketing anyway and a
+	dict of every date in a three-year range would be mostly padding.
+	"""
+	filters = {
+		"tracker": tracker,
+		"docstatus": 1,
+		"transaction_type": ["in", SPEND_TYPES],
+	}
+	if from_date and to_date:
+		filters["date"] = ["between", [from_date, to_date]]
+
+	if category:
+		subtree = get_subtree(category)
+		if not subtree:
+			return {}
+		filters["category"] = ["in", subtree]
+
+	rows = frappe.get_all(
+		"Transaction",
+		filters=filters,
+		fields=["date", "transaction_type", "SUM(base_amount) as total"],
+		group_by="date, transaction_type",
+	)
+
+	by_date = {}
+	for row in rows:
+		day = getdate(row.date)
+		by_date[day] = flt(by_date.get(day, 0.0)) + net_sign(row.transaction_type) * flt(row.total)
+	return by_date
+
+
+def get_subtree(category):
+	"""A category and every category filed under it, by name.
+
+	One query on the NestedSet bounds rather than a recursive walk — and scoped to the
+	category's own tracker, since `lft`/`rgt` are only unique within one tree.
+	"""
+	row = frappe.db.get_value("Category", category, ["tracker", "category_type", "lft", "rgt"], as_dict=True)
+	if not row:
+		return []
+
+	return frappe.get_all(
+		"Category",
+		filters={
+			"tracker": row.tracker,
+			"category_type": row.category_type,
+			"lft": [">=", row.lft],
+			"rgt": ["<=", row.rgt],
+		},
+		pluck="name",
+	)

@@ -109,6 +109,8 @@ reconciliation.
 | **Money Account** — `ACC-00001` | Where money sits: a bank, a wallet, a credit card. Backed 1:1 by an ERPNext `Account` created for it automatically — the user never picks a ledger account. |
 | **Category** — `CAT-00001`, tree | What money was for. A NestedSet tree: a **group** is a heading that holds no ledger account and cannot be posted to, so *Food 4,500* is always exactly the sum of its leaves. |
 | **Tracker** — `TRK-00001` | Whose books these are. Registered as an ERPNext **Accounting Dimension**, so it is stamped on every GL row and every standard report can be filtered by it — which is why the app contains no per-user reporting code at all. |
+| **Money Goal** — `GOL-00001` | A target and a window — save this much, keep under that, reach this net worth. Stores **no progress**: every figure is measured from the ledger on read, so cancelling a transaction cannot leave a counter stranded. |
+| **Money Budget** — `BGT-00001` | An envelope that refills every period. Not a goal: a goal is one window with a deadline, a budget *repeats*, and carries a Period and a Rollover that a goal deliberately has not got. Stores no spending either. |
 | **Money Settings** — Single | The one place a company, base currency, cost centre and chart-of-accounts parents are resolved. Nothing in the app hardcodes any of them. |
 | **Leg** — `posting/leg.py` | One side of an entry: an account and either a debit or a credit, never both. A frozen dataclass that refuses to exist in an invalid state. |
 | **Strategy** — `posting/strategies/` | The accounting rule for one transaction type, as a pure function returning legs. One module each. |
@@ -177,13 +179,15 @@ moneytracker/money_tracker/
   services/
     coa.py          provisions ERPNext Accounts
     balances.py     balances and net worth, derived from GL Entry
-    categories.py   the default category tree and roll-up totals
-    trends.py       per-period income and expense series, behind both charts
+    categories.py   the default category tree, roll-up totals and net spend by day
+    trends.py       per-period income and expense series, behind both trend charts
+    goals.py        GOAL_TYPES — one measure per kind of goal, all derived on read
+    budgets.py      PERIODS — the envelope calendar, the rollover and the alert job
     settings.py     accessors for Money Settings
     fx.py           currency conversion, over ERPNext's Currency Exchange
   api/              whitelisted endpoints, incl. the dashboard number cards
-  number_card/      the five shipped Number Card fixtures
-  dashboard_chart/  the two shipped charts, over one Dashboard Chart Source
+  number_card/      the seven shipped Number Card fixtures
+  dashboard_chart/  the four shipped charts, over three Dashboard Chart Sources
   demo.py           the demo household — seed and teardown, bench execute only
   permissions.py    row-level security — the only user isolation there is
   workspace/        the Desk workspace
@@ -195,19 +199,26 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is complete, verified and covered by **234 tests**
+Phase 1 is complete; Phase 2 has goals and budgets. All of it is covered by **426 tests**
 (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
 | **5** | posting strategies implemented, of fourteen declared types |
-| **5** | dashboard Number Cards — total balance, net worth, income, expenses, savings rate |
-| **2** | Dashboard Charts — income vs expense, spending trend — over one shared source |
+| **7** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets |
+| **4** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual |
+| **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
+| **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
 | **38** | categories seeded for a new tracker, as a two-level tree |
 
+Goals and budgets share one habit with `Money Account.current_balance`: **they store nothing
+they could derive**. A stored counter drifts the first time a transaction is cancelled, and
+nothing in the data says that it has. The one exception is a budget's `last_alert`, which is
+bookkeeping about a message that was sent rather than anything about the money.
+
 A demo household (`money_tracker/demo.py`, run from `bench execute`) seeds six months of
-deterministic transactions and removes them again, so the app can be shown in the state it
-is meant to be used in. The frontend is deliberately deferred — Phase 1 is the backend and
-Desk only; Phase 2 opens with per-tracker goals.
+deterministic transactions, one goal of every type and five budgets, and removes them again,
+so the app can be shown in the state it is meant to be used in. The frontend is deliberately
+deferred — Phase 1 is the backend and Desk only.
 
 See `CLAUDE.md` for working conventions and `task.md` for the current resume point.

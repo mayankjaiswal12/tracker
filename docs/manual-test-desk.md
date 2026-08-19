@@ -39,7 +39,8 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 Tracker **Demo Household** and its four accounts are the demo data
 (`money_tracker/demo.py`), seeded 2026-08-16: 67 transactions over 2026-04-01 … 2026-08-15,
-which is what the workspace cards and charts show. Ignore it for the posting steps — this
+seven goals added 2026-08-17 and **five budgets added 2026-08-19**, which is what the
+workspace cards and charts show. Ignore it for the posting steps — this
 run creates its own `DT *` set so the numbers stay clean — and use it in §7, where the point
 is that the widgets read a populated tracker.
 
@@ -214,7 +215,8 @@ posted, so the numbers are the ones from step 6 seen a different way.
 >
 > Unfiltered, against the demo household, the cards read **Total Balance 3,32,550 · Net
 > Worth 2,61,755 · Income This Month 1,20,000 · Expenses This Month 67,899 · Savings Rate
-> 43.4% · Goals on Track 6 of 7** (verified 2026-08-16, goals 2026-08-17). The current month is deliberately part-finished — the
+> 43.4% · Goals on Track 6 of 7 · Budgets on Track 3 of 5** (verified 2026-08-16, goals
+> 2026-08-17, budgets 2026-08-19). The current month is deliberately part-finished — the
 > seeder skips future-dated rows — so those two month figures grow as the month does.
 
 ### The Number Cards
@@ -227,6 +229,7 @@ posted, so the numbers are the ones from step 6 seen a different way.
 | Expenses This Month | **4,500** | 2,000 + 3,000 − 500 refund |
 | Savings Rate | **91.0%** | (50,000 − 4,500) / 50,000 |
 | Goals on Track | **—** | no goals yet; §13 builds them and this becomes **5 of 6** |
+| Budgets on Track | **—** | no budgets yet; §14 builds them and this becomes **1 of 3** |
 
 ✅ **The key check:** Total Balance is 47,500, not 49,500. Every account is reported in its
 natural direction, so the credit card's 2,000 comes back positive; adding it in would show
@@ -238,8 +241,8 @@ string server-side rather than handing the browser a bare number.
 ### The charts
 
 Income vs Expense and Spending Trend are `Custom` charts fed by the `Money Period Totals`
-source, monthly, last year. The third, **Goal Progress**, has its own source and is covered
-in §13.
+source, monthly, last year. The other two each have a source of their own and are covered
+where they belong — **Goal Progress** in §13, **Budget vs Actual** in §14.
 
 - **Income vs Expense** (bar) — two series. This month: Income 50,000, Expense 4,500.
 - **Spending Trend** (line) — the expense series alone.
@@ -544,17 +547,158 @@ what the dashboard is counting. Set it back to `Active`.
 
 ---
 
-## 14. Cleanup (optional)
+## 14. Budgets
+
+**Money Tracker → Money Budget → + Add Money Budget.** Three envelopes over the same six
+transactions. A budget stores **no spending** — like a goal, every figure below is measured
+from the ledger each time you open the form.
+
+A budget is deliberately **not** a Spending Limit goal. A goal is one window with a
+deadline; an envelope *repeats*, and carries two things a goal has not got — a Period that
+refills it, and a Rollover that decides whether last month's leftovers are still there.
+
+Set **Tracker `Desk Test`** on each one, and give every one of them
+**Start Date `2026-08-01`, End Date `2026-08-31`**.
+
+> Why an End Date: a budget is otherwise **live** — it always measures the period containing
+> today, so running this pass in September would read an empty September rather than the
+> August you posted into. The end date clamps the measurement to August's envelope forever,
+> which is the same rule that stops a finished budget opening a fresh clean envelope every
+> month. Everything below is therefore date-independent, like §13.
+
+| # | Budget Name | Period | Amount | Category | Threshold |
+|---|---|---|---|---|---|
+| 1 | `DT Food Budget` | Monthly | 6000 | `DT Food` *(the group)* | 80 |
+| 2 | `DT Tight Cap` | Monthly | 5000 | `DT Groceries` | 80 |
+| 3 | `DT Everything` | Monthly | 4000 | *(leave empty)* | 80 |
+
+✅ The Category link offers **only expense categories**, and it *does* offer `DT Food` even
+though it is a group. That is the point of #1: one envelope over everything filed under it —
+the exact opposite of `Transaction`, which refuses to post to a heading.
+
+✅ #1 and #2 are allowed to coexist: a cap on the parent and a tighter cap on one child is a
+real way to budget. What is refused is two envelopes over the *same* category on the *same*
+clock — see the refusals below.
+
+### The period block
+
+Reload each saved budget. The **This Period** block at the top of the form:
+
+| Budget | Used | Period | Outcome | Footnote reads |
+|---|---|---|---|---|
+| DT Food Budget | **75.0%** | Aug 2026 | Within Budget | 4,500 of 6,000 spent · 1,500 left · 1 days left · 1,500.00 a day left |
+| DT Tight Cap | **90.0%** | Aug 2026 | Nearing Limit | 4,500 of 5,000 spent · 500 left · … |
+| DT Everything | **112.5%** | Aug 2026 | Over Budget | 4,500 of 4,000 spent · -500 over |
+
+The 4,500 is the same figure the Expenses This Month card gives in §7: 2,000 + 3,000 less
+the 500 refund. Three things are worth stopping on:
+
+✅ **#1 reads 4,500, not zero.** Nothing was ever posted to `DT Food` itself — it is a
+heading. The envelope rolls its subtree up.
+
+✅ **#3 reads 4,500 too**, with no category at all. An empty category means the whole
+tracker's spending — and the **transfer and the credit card payment are not in it**. Moving
+your own money about empties no envelope.
+
+✅ **The bar is clamped, the figures are not.** #3's bar is full, and its text still says
+112.5% and *-500 over*. The bar has no more width to give; the number has no reason to lie.
+
+✅ The thin vertical line on the bar is the **pace marker** — how much of the period has
+passed. It sits at the far right here, because the window is closed.
+
+### Alerts
+
+`Notify Me` is on by default, and #2 and #3 have both crossed a line. From a shell:
+
+```bash
+docker exec -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
+  bash -lc 'bench --site tracker.localhost execute moneytracker.money_tracker.services.budgets.send_budget_alerts'
+```
+
+✅ The **bell icon** in Desk's navbar gains two notifications: *"DT Tight Cap is at 90.0% of
+its budget for Aug 2026"* and *"DT Everything is over budget: ₹ 4,500.00 of ₹ 4,000.00 spent
+in Aug 2026"*. They go to the **tracker's owner**, not to whoever ran the job.
+
+✅ It will also alert on the demo household's `Fuel & Commute` and `Household Bills`, which
+are genuinely over and near. That is the job working, not a leak.
+
+✅ **Run it again.** No new notifications. Each budget is stamped with the period and outcome
+it last announced, so the same fact is never told twice. Now open `DT Food Budget`, drop its
+amount to `4000`, save, and run the job once more: it appears, because that is a new fact.
+
+### Rollover — go and look at the demo household
+
+The `DT *` set is one month old, so it has nothing to roll over. Open **Eating Out** on
+`Demo Household` instead, the one demo budget with Rollover ticked (measured 2026-08-19):
+
+✅ Amount **3,000**, but the footnote says **2,400 of 5,400 spent** and **2,400 carried in**.
+Four finished months at 600 left over each. `Within Budget` at 44.44%.
+
+✅ Below the bar, a strip of small columns — **the earlier periods**, against a dashed line
+for the envelope. That strip is the one thing a budget shows that a goal cannot: the same
+envelope, over and over.
+
+✅ Tick Rollover **off** on it and save. The footnote becomes *2,400 of 3,000 spent* and the
+carried-in line vanishes. Tick it back on.
+
+> Rollover carries a **deficit** as well as a surplus — an envelope that quietly forgets last
+> month's overspend is two budgets wearing one name. `Fuel & Commute` would show it if it had
+> rollover on; the automated suite covers it.
+
+### The refusals
+
+Try each; each should be refused on save:
+
+| What you do | Expected |
+|---|---|
+| A budget with Category `DT Salary` | *"DT Salary is an income category. A budget caps spending, so it is set against an expense."* |
+| A **second** Monthly budget on `DT Groceries` | *"DT Tight Cap is already a Monthly budget over the same category…"* |
+| Budget Amount `0` | *"Budget Amount must be greater than zero."* |
+| End Date before Start Date | *"End Date cannot be before Start Date."* |
+| Alert Threshold `150` | *"Alert Threshold must be greater than 0 and no more than 100."* |
+| A second budget named `DT Tight Cap` | *"A budget named DT Tight Cap already exists on this tracker."* |
+
+✅ Now change the second `DT Groceries` budget's **Period to `Yearly`** and save: it goes
+through. A monthly grocery cap inside a yearly one is two different questions about the same
+money, not the same question twice. Delete it again before moving on.
+
+✅ Set `DT Tight Cap`'s **Status to `Paused`**, then try the duplicate Monthly budget again:
+it now saves. A paused envelope is not counting anything, so nothing is double-counted. Undo
+both.
+
+### The dashboard, a third time
+
+Back to **Money Tracker**, with every widget's Tracker filter on `Desk Test`:
+
+✅ **Budgets on Track** reads **1 of 3** — only `DT Food Budget`. `Nearing Limit` and
+`Over Budget` are both warnings, and neither counts as on track.
+
+✅ **Budget vs Actual** draws **three pairs of bars**, largest envelope first — *DT Food
+Budget · DT Tight Cap · DT Everything* — with Budget at 6,000 / 5,000 / 4,000 and Spent at
+4,500 on all three.
+
+✅ Click the funnel: **Tracker**, **Status** and **Period** filters, with Period defaulting
+to `Monthly`. Set it to `Yearly` → **no bars**, because all three are monthly. Blank means
+every period, which puts a weekly envelope next to a yearly one — the reason the filter
+defaults to a single clock rather than to everything.
+
+✅ Unfiltered, against the demo household, the chart shows **four** bars and not five: the
+`Travel Fund` is Yearly, and the default filter is doing its job.
+
+---
+
+## 15. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
-2. Delete the six `DT *` goals from §13 — a goal is not submittable, so it just deletes.
+2. Delete the six `DT *` goals from §13 and the three `DT *` budgets from §14 — neither is
+   submittable, so they just delete.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
 4. Delete `DT Bank`, `DT SBI`, `DT Card`.
 5. Delete tracker `Desk Test`, and user `dt.other@example.com`.
 
-Goals before accounts and categories: a goal links to both.
+Goals and budgets before accounts and categories: both link to both.
 
 Two things deliberately survive and are safe to leave:
 
@@ -577,3 +721,9 @@ Two things deliberately survive and are safe to leave:
   case: open any of them from §7 and the pace marker sits mid-bar.
 - `Money Goal`'s `Archived` status, and a Savings goal on the `Contributions Since Start`
   basis — §13's pot uses `Account Balance`. Both are covered by the automated suite.
+- A budget on a **Weekly or Quarterly** period, and a rollover carrying a **deficit** — §14
+  is monthly throughout and the one rollover it looks at is in surplus. Both are covered by
+  the automated suite.
+- A budget measured **while its period is still running**. §14 clamps every envelope to a
+  closed August on purpose, so its figures read the same whenever you run it; the demo
+  household's five budgets are the live case, and their pace markers sit mid-bar.
