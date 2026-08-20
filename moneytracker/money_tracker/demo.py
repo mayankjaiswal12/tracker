@@ -28,6 +28,7 @@ from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day
 from moneytracker.money_tracker.services import balances
 from moneytracker.money_tracker.services import budgets as budgets_service
 from moneytracker.money_tracker.services import goals as goals_service
+from moneytracker.money_tracker.services import recurring as recurring_service
 from moneytracker.money_tracker.services import settings as settings_service
 
 # Written into the tracker's description. `clear_demo_data` refuses to touch a tracker
@@ -408,6 +409,40 @@ DEMO_BUDGETS = (
 	},
 )
 
+# The standing orders behind the plan above: the rows of MONTHLY that are not decisions but
+# arrangements — the salary that arrives, the rent that leaves, the transfer nobody thinks
+# about, the two bills.
+#
+# Each row names a `day`, which identifies the MONTHLY row it stands for (days are unique
+# within MONTHLY). The seeder **adopts** that row's already-posted transactions rather than
+# posting them again, so every plan opens with a real history strip and nothing due — which
+# is what a standing order actually looks like. Like the budgets, they start with the ledger:
+# a plan created today has no history to show and nothing to prove it works.
+#
+# `ONE_OFFS` rows are deliberately never adopted. A one-off is by definition not an
+# arrangement, and a bonus that turned up once in April is not a plan.
+DEMO_RECURRING = (
+	{"day": 1, "recurring_name": "Salary", "notes": "Credited on the 1st"},
+	{"day": 2, "recurring_name": "Rent", "color": "#4463f0"},
+	{"day": 3, "recurring_name": "Savings Transfer", "notes": "Pay yourself first"},
+	{
+		"day": 5,
+		"recurring_name": "Electricity Bill",
+		# The one plan that does not post itself. An electricity bill is a different number
+		# every month, so posting 3,200 automatically would be inventing the figure — this is
+		# exactly what `Create as Draft` is for, and a demo without one cannot show it.
+		"create_mode": "Create as Draft",
+	},
+	{
+		"day": 6,
+		"recurring_name": "Streaming Subscriptions",
+		# Netflix and Spotify on the card: the case a `Money Subscription` doctype would one
+		# day own the *other* half of. The plan knows the money and the calendar; it knows
+		# nothing about the vendor, the renewal date or the price rise. See services/recurring.
+		"color": "#743ee2",
+	},
+)
+
 
 # --- setup -------------------------------------------------------------------------------
 
@@ -446,8 +481,18 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 
 	posted = 0
 	skipped = 0
+	# Which transactions each repeating row of the plan produced, so the standing orders
+	# below can adopt them instead of posting the same months over again.
+	posted_by_day = {}
 	for index, month_start in enumerate(period):
-		for row in MONTHLY + ONE_OFFS.get(index, ()):
+		for row in MONTHLY:
+			name = _post(tracker, accounts, methods, month_start, row)
+			if name:
+				posted += 1
+				posted_by_day.setdefault(row["day"], []).append(name)
+			else:
+				skipped += 1
+		for row in ONE_OFFS.get(index, ()):
 			if _post(tracker, accounts, methods, month_start, row):
 				posted += 1
 			else:
@@ -457,8 +502,9 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 	# against an empty tracker would only be visible once something had been posted anyway.
 	goals = _create_goals(tracker, accounts, period)
 	budgets = _create_budgets(tracker, period)
+	plans = _create_recurring(tracker, accounts, methods, period, posted_by_day)
 
-	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets)
+	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets, plans)
 
 
 def _create_tracker(user, tracker_name):
@@ -602,6 +648,61 @@ def _budget_category(tracker, row):
 	return name
 
 
+def _create_recurring(tracker, accounts, methods, period, posted_by_day):
+	"""Create the standing plans and adopt the transactions they already stand for.
+
+	The adoption is the whole trick. Each plan is created with the ledger's own start date and
+	then the transactions the plan table already posted on those days are stamped with its
+	name. So a demo plan opens with a real history strip, a real next date and **nothing due**
+	— and it cannot double-post, because `due_dates()` asks the ledger which dates are already
+	handled rather than trusting a counter.
+
+	It is also why the demo is safe to leave alone: run the daily job on this site and it posts
+	nothing, because every occurrence up to today already exists.
+	"""
+	created = []
+	for row in DEMO_RECURRING:
+		plan_row = _monthly_row(row["day"])
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Recurring Transaction",
+				"tracker": tracker,
+				"recurring_name": row["recurring_name"],
+				"transaction_type": plan_row["transaction_type"],
+				"amount": plan_row["amount"],
+				"frequency": "Monthly",
+				"start_date": getdate(period[0]).replace(day=row["day"]),
+				"account": accounts[plan_row["account"]],
+				"destination_account": accounts.get(plan_row.get("destination_account")),
+				"category": _category(tracker, plan_row) if plan_row.get("category") else None,
+				"payment_method": methods.get(plan_row.get("payment_method")),
+				"merchant": plan_row.get("merchant"),
+				"payee": plan_row.get("payee"),
+				"create_mode": row.get("create_mode", recurring_service.POST_AUTOMATICALLY),
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+		for transaction in posted_by_day.get(row["day"], ()):
+			frappe.db.set_value(
+				"Transaction", transaction, "recurring_transaction", doc.name, update_modified=False
+			)
+		created.append(doc.name)
+	return created
+
+
+def _monthly_row(day):
+	"""The MONTHLY row a standing plan stands for. Days are unique within MONTHLY."""
+	for row in MONTHLY:
+		if row["day"] == day:
+			return row
+	frappe.throw(
+		_("Demo standing order names day {0}, which the monthly plan does not have.").format(frappe.bold(day))
+	)
+
+
 def _seed_account_groups():
 	"""Money Account Group is site-wide, so only fill it when it is empty."""
 	if frappe.db.count("Money Account Group"):
@@ -641,12 +742,12 @@ def _seed_payment_methods():
 
 
 def _post(tracker, accounts, methods, month_start, row):
-	"""Post one row of the plan. Returns False if its date has not arrived yet."""
+	"""Post one row of the plan. Returns its name, or None if the date has not arrived yet."""
 	date = getdate(month_start).replace(day=row["day"])
 	if date > getdate(today()):
 		# The current month is deliberately left part-finished: a month in progress is what
 		# the dashboard normally shows, and a full one would misrepresent it.
-		return False
+		return None
 
 	transaction = frappe.get_doc(
 		{
@@ -666,7 +767,7 @@ def _post(tracker, accounts, methods, month_start, row):
 	)
 	transaction.insert(ignore_permissions=True)
 	transaction.submit()
-	return True
+	return transaction.name
 
 
 def _category(tracker, row):
@@ -714,12 +815,13 @@ def _covered_by_a_fiscal_year(date):
 	)
 
 
-def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_names):
+def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_names, plan_names):
 	currency = frappe.db.get_value("Tracker", tracker, "base_currency")
 	rows = balances.get_balances_for_tracker(tracker)
 	net_worth = balances.get_net_worth(tracker)
 	measured = goals_service.measure_goals(tracker)
 	envelopes = budgets_service.measure_budgets(tracker)
+	plans = recurring_service.measure_plans(tracker)
 
 	summary = {
 		"tracker": tracker,
@@ -732,11 +834,13 @@ def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_
 		"net_worth": flt(net_worth["net_worth"]),
 		"goals": {row.goal_name: (row.progress_percent, row.outcome) for row in measured},
 		"budgets": {row.budget_name: (row.used_percent, row.outcome) for row in envelopes},
+		"recurring": {row.recurring_name: (row.monthly_equivalent, row.outcome) for row in plans},
+		"fixed_costs": flt(recurring_service.get_fixed_costs(tracker).monthly),
 	}
 
 	print(
 		f"\nDemo tracker {tracker} ({tracker_name}) — {posted} transactions, "
-		f"{len(goal_names)} goals, {len(budget_names)} budgets"
+		f"{len(goal_names)} goals, {len(budget_names)} budgets, {len(plan_names)} standing orders"
 	)
 	print(f"  months   {summary['months'][0]} … {summary['months'][-1]}")
 	for account_name, balance in summary["balances"].items():
@@ -747,6 +851,9 @@ def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_
 		print(f"  {goal_name:<24} {figure:>8}  {outcome}")
 	for budget_name, (percent, outcome) in summary["budgets"].items():
 		print(f"  {budget_name:<24} {percent:>7}%  {outcome}")
+	for plan_name, (monthly, outcome) in summary["recurring"].items():
+		print(f"  {plan_name:<24} {fmt_money(monthly, currency=currency):>12} a month  {outcome}")
+	print(f"  {'fixed costs':<24} {fmt_money(summary['fixed_costs'], currency=currency):>12} a month")
 
 	# The dashboard cards fall back to the user's *earliest* tracker, not the newest one.
 	owner = frappe.db.get_value("Tracker", tracker, "owner_user")
@@ -809,10 +916,13 @@ def clear_demo_data(tracker=None, tracker_name=None):
 		frappe.db.delete("Journal Entry", {"name": ["in", journal_entries]})
 	frappe.db.delete("Transaction", {"tracker": tracker})
 
-	# Goals and budgets before accounts and categories: they link to both, and deleting the
-	# account out from under one would leave a dangling link for the seconds until it too went.
+	# Goals, budgets and standing orders before accounts and categories: they link to both, and
+	# deleting the account out from under one would leave a dangling link for the seconds until
+	# it too went. The transactions are already gone by here, so no plan has a back-link left
+	# to clear.
 	removed["goals"] = _delete_all("Money Goal", {"tracker": tracker})
 	removed["budgets"] = _delete_all("Money Budget", {"tracker": tracker})
+	removed["recurring"] = _delete_all("Money Recurring Transaction", {"tracker": tracker})
 	removed["money_accounts"] = _delete_all("Money Account", {"tracker": tracker})
 	removed["categories"] = _delete_categories(tracker)
 	frappe.delete_doc("Tracker", tracker, ignore_permissions=True, force=True)

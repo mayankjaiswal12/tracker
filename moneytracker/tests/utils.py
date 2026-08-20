@@ -153,6 +153,38 @@ def make_budget(tracker=None, **kwargs):
 	return doc
 
 
+def make_recurring(tracker=None, **kwargs):
+	"""A standing plan on `tracker`. A monthly 1,000 expense unless told otherwise.
+
+	`start_date` defaults to **today** rather than to the first of the month, unlike
+	`make_budget`: a plan never posts for a date before it was created
+	(`recurring.effective_from`), so a back-dated start would produce a fixture that looks
+	overdue and generates nothing. A test that wants catch-up moves `creation` instead — see
+	`backdate_plan`.
+	"""
+	kwargs.setdefault("recurring_name", unique("Plan"))
+	kwargs.setdefault("transaction_type", "Expense")
+	kwargs.setdefault("frequency", "Monthly")
+	kwargs.setdefault("amount", 1000)
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Recurring Transaction", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def backdate_plan(plan, creation):
+	"""Move a plan's `creation` back, so generation may reach dates before the test began.
+
+	`effective_from` is deliberately the later of the start date and the day the plan was
+	written down, which means a freshly inserted fixture can never generate history. Every
+	catch-up test therefore has to say, explicitly, that this plan existed earlier.
+	"""
+	frappe.db.set_value("Money Recurring Transaction", plan.name, "creation", creation, update_modified=False)
+	plan.reload()
+	return plan
+
+
 def make_user(roles=("Finance User",)):
 	"""A user with only the restricted roles, so the permission hooks actually apply."""
 	email = f"mt-{frappe.generate_hash(length=8)}@example.com"

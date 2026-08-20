@@ -1,0 +1,13 @@
+{
+ "creation": "2026-08-20 10:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2026-08-20 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Recurring Forecast",
+ "owner": "Administrator",
+ "source_name": "Money Recurring Forecast",
+ "timeseries": 0
+}

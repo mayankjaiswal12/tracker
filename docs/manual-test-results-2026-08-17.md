@@ -3,13 +3,67 @@
 The record of walking `docs/manual-test-desk.md`. That document says what to expect; this one
 says what actually happened.
 
-**Status: in progress — one finding, found and fixed.** Tick as you go: `[ ]` → `[x]` for a
-pass, `[!]` for a finding, then write the finding up in the log below.
+**Status: in progress — two findings, both found and fixed.** Tick as you go: `[ ]` → `[x]`
+for a pass, `[!]` for a finding, then write the finding up in the log below.
 
+> **Scope grew again on 2026-08-20.** `Money Recurring Transaction` landed on branch
+> `feat/phase-2-recurring`, so the walkthrough now has **§15 Recurring** and cleanup has moved
+> to §16. The workspace has two more cards (`Plans Running`, `Fixed Costs`), a fifth chart
+> (`Upcoming Recurring`) and a Recurring section — **14 laid-out widgets**, all confirmed to
+> resolve. The demo household gained five standing orders (`RTX-00001`…`00005`).
+>
 > **Scope grew on 2026-08-19.** `Money Budget` landed on branch `feat/phase-2-budgets`, so the
 > walkthrough now has **§14 Budgets** and cleanup has moved to §15, and the workspace has a
 > seventh card (`Budgets on Track`) and a fourth chart (`Budget vs Actual`). The confirmed
 > figures below have been extended to match. Everything else in this file still stands.
+
+---
+
+## Pre-flight, 2026-08-20 — run again before you start
+
+The containers had been restarted, so everything below was re-established from scratch and
+re-measured against **today**. One finding came out of it (F2, the branch), and every figure
+in this document still holds.
+
+| Check | Result |
+|---|---|
+| Containers | all four up; MariaDB reachable, no re-grant needed |
+| Branch | **switched `dev` → `feat/phase-2-budgets`** — see F2 |
+| `migrate` | clean; rewrote no fixture JSON (working tree still only the docs) |
+| `bench build --app moneytracker` | rebuilt after the branch switch |
+| Suite | **426 green, 36s** (339 and one failure on `dev` — F2) |
+| Dev server | `bench start` running, Desk answered 200 |
+
+### What the browser will be served — reproduced server-side
+
+- **All 14 laid-out widgets resolve.** `block.js`'s label lookup was replayed against what
+  `get_desktop_page` actually serves: 9 cards + 5 charts, **0 that would render nothing.**
+  This is F1's fix still holding, now over the two budget widgets and the three recurring ones
+  as well. (11 when the pre-flight first ran; recurring landed the same day.)
+- **Every method named by a widget or a form exists and is whitelisted** — the seven
+  `card_*`, the three chart-source `get`s, `get_goal_progress`, `get_budget_progress`,
+  `create_transaction`. A chart source's `.js` is eval'd in the browser and nothing imports
+  it, so a stale path there fails *only* in a browser; none is stale.
+- **Both forms will ship their client script.** `getdoctype` returns `__js` of 5,973 chars for
+  `Money Budget` (carrying the carried-in, history and pace code) and 6,736 for `Money Goal`,
+  and both doctypes expose the `progress_html` field they draw into.
+- `Money Budget` is in **both** permission hook lists (`hooks.py:131` and `:140`).
+
+### Today's figures — the pace numbers have moved, and that is not a finding
+
+Cards, charts, goals and budgets all re-measured on 2026-08-20 and **identical** to the tables
+below, with one exception by design: a **pace** figure is the share of the window that has
+elapsed, so it moves every day.
+
+| Goal | Pace 08-17 | Pace 08-20 |
+|---|---|---|
+| Dining Out Budget | 54.84% | **64.52%** (20 of 31 days of August) |
+| Clear the Credit Card · Freelance Income | 38.08% | **38.9%** |
+| Emergency Fund · First 10 Lakh | 19.86% | **20.29%** |
+| Japan Trip | 2.94% | **3.46%** |
+
+`Save 30% of Income` still has no pace — a rate has none. Budget footnotes move the same way:
+August's envelope now reads **11 days left** rather than 14.
 
 ---
 
@@ -41,7 +95,7 @@ the goal measures directly against `TRK-00002`. **The arithmetic is not what you
 If the browser shows something different from this table, that is a *rendering or wiring* bug —
 which is exactly what a manual pass is for.
 
-### The six Number Cards, unfiltered
+### The nine Number Cards, unfiltered
 
 | Card | Confirmed value |
 |---|---|
@@ -52,11 +106,13 @@ which is exactly what a manual pass is for.
 | Savings Rate | `43.4%` |
 | Goals on Track | `6 of 7` |
 | Budgets on Track | `3 of 5` *(added 2026-08-19)* |
+| Plans Running | `5 of 5` *(added 2026-08-20)* |
+| Fixed Costs | `₹ 39,699.00` *(added 2026-08-20)* |
 
 Cross-checks that hold: 2,51,300 + 76,850 + 4,400 = **3,32,550**; less the 70,795 owed on the
 card = **2,61,755**; and the category roll-up below sums to **67,899**.
 
-### The three charts
+### The five charts
 
 | Chart | Labels | Series |
 |---|---|---|
@@ -64,6 +120,7 @@ card = **2,61,755**; and the category roll-up below sums to **67,899**.
 | Spending Trend | 13, same | `Expense` only |
 | Goal Progress | 7, `Dining Out Budget` … `First 10 Lakh` | `Progress` |
 | Budget vs Actual | **4**, `Household Bills` `Groceries` `Fuel & Commute` `Eating Out` | `Budget`, `Spent` |
+| Upcoming Recurring | 6, this month … five ahead | `Income`, `Expense` |
 
 `Budget vs Actual` shows four and not five on purpose: `Travel Fund` is a **Yearly** budget
 and the chart's `period` filter defaults to `Monthly`, because a weekly envelope drawn beside
@@ -113,6 +170,36 @@ Expenses This Month is 67,899 rather than a full month.
 
 ---
 
+### The five standing orders
+
+Measured 2026-08-20. All five adopted the transactions they stand for, so every one of them
+opens with five posted occurrences and **nothing due**.
+
+| Plan | Type | Monthly | Posted | Total | Next | Outcome |
+|---|---|---|---|---|---|---|
+| Salary | Income | 1,20,000 | 5 | 6,00,000 | 2026-09-01 | Scheduled |
+| Rent | Expense | 35,000 | 5 | 1,75,000 | 2026-09-02 | Scheduled |
+| Savings Transfer | Transfer | 15,000 | 5 | 75,000 | 2026-09-03 | Scheduled |
+| Electricity Bill | Expense | 3,200 | 5 | 16,000 | 2026-09-05 | Scheduled |
+| Streaming Subscriptions | Expense | 1,499 | 5 | 7,495 | 2026-09-06 | Scheduled |
+
+✅ **Fixed Costs 39,699** is the three *expense* plans only: 35,000 + 3,200 + 1,499. The salary
+is not a cost by any reading, and the transfer is a commitment but not a cost — the money is
+still yours.
+
+✅ `Electricity Bill` is the one plan set to **Create as Draft**, because an electricity bill is
+a different number every month.
+
+✅ **`Upcoming Recurring` reads zero for the current month on both series.** Every August
+occurrence (days 1–6) has already been dealt with, and the forecast window opens *strictly
+after today* so one rent cannot appear in both the forecast and the actuals. September onwards:
+Income 1,20,000, Expense 39,699.
+
+✅ Running the nightly job on this site posts **nothing** — `{'plans': 5, 'posted': 0,
+'failed': 0, 'notified': 0}`. Every occurrence up to today already exists in the ledger.
+
+---
+
 ### Balances and the category roll-up
 
 | Account | Type | Balance | | Category | Own | Roll-up |
@@ -139,6 +226,7 @@ what happened, whether it repeats.
 | # | § | Severity | What | Status |
 |---|---|---|---|---|
 | F1 | §7 | **bug** | No Number Card and no Dashboard Chart rendered anywhere on the workspace — nine widgets, empty headings | **fixed** |
+| F2 | §0 | **env** | The checkout was on `dev`, which has no budgets code, while the site is budget-migrated — §14 could not have run and one guard test failed | **fixed** |
 
 ### F1 — §7 — bug — every card and chart rendered as empty space
 
@@ -189,6 +277,46 @@ silently, leaving the site laid out the old way while the repo looks right.
 paint, showing the figures confirmed above. `bench start` is running and the cache was cleared,
 so a hard reload of the workspace is all it needs.
 
+### F2 — §0 — env — the checkout was on the wrong branch for half the walkthrough
+
+**What happened.** `git status` said `dev`. `dev` is the goals merge (`e8f61dd`) and has **no
+budgets code at all** — `moneytracker/money_tracker/doctype/money_budget/` held nothing but a
+stale `__pycache__`. Budgets are still on `feat/phase-2-budgets` (`3cfdd70`), unmerged. The
+site, meanwhile, is budget-migrated: `Money Budget`, the five demo envelopes, the
+`Budgets on Track` card and the `Budget vs Actual` chart are all in the database.
+
+**How it surfaced.** The suite ran **339 tests, one failure** — not the documented 426. The
+failure was `test_workspace.TestWorkspaceWidgetsRender.test_the_site_agrees_with_the_shipped_file`,
+reporting that the site serves a seventh Number Card the shipped workspace file has never heard
+of:
+
+```
+First extra element 6:
+('Budgets on Track', 'Budgets on Track')
+```
+
+That guard was written after F1 to catch a workspace edited without bumping `modified`. It
+caught a different thing entirely — code and site out of step — which is the same class of
+fault and exactly what it should do.
+
+**Why it mattered to the pass.** §14 is fifteen minutes of the walkthrough and could not have
+been started: no `Money Budget` doctype to add. Worse for the pass's *purpose*, the workspace
+would still lay out a `Budgets on Track` card pointing at
+`moneytracker.money_tracker.api.budgets.card_budgets_on_track`, a module that does not exist on
+`dev` — so §7 would have shown a broken card and it would have read as a rendering finding
+rather than a checkout one.
+
+**Fix.** Switched to `feat/phase-2-budgets`, re-ran `migrate` (clean, no fixture JSON rewritten),
+`clear-cache`, `bench build --app moneytracker`. Suite back to **426 green**. The staged docs
+carried over untouched, `docs/how-money-tracker-works.html` included.
+
+**Note for whoever merges.** The doc files were already identical on both branches —
+`docs/architecture.md` and `docs/manual-test-desk.md` on `dev` matched
+`feat/phase-2-budgets` byte for byte, so the budgets *documentation* had been copied onto `dev`
+while the budgets *code* stayed behind. That is what made the mismatch invisible: CLAUDE.md
+and every doc described budgets, and only the suite disagreed. **Run the pass on the branch that
+ships the feature, and check the test count before starting — 426, not 339.**
+
 ---
 
 ## The pass
@@ -225,7 +353,7 @@ so a hard reload of the workspace is all it needs.
 - [ ] DT Bank **39,500** · DT SBI **8,000** · DT Card **2,000**
 
 ### §7 The dashboard
-- [ ] Six cards render, unfiltered, matching the confirmed table above
+- [ ] Seven cards render, unfiltered, matching the confirmed table above
 - [ ] Each money card shows the **tracker's** currency symbol
 - [ ] Filtered to `Desk Test`: 47,500 · 45,500 · 50,000 · 4,500 · 91.0% · **—** (no goals yet)
 - [ ] Income vs Expense: 13 labels, the eight empty months drawn as **zero, not skipped**
@@ -234,6 +362,9 @@ so a hard reload of the workspace is all it needs.
 - [ ] Chart funnel offers **Tracker** and **Series** only — no doctype filter fields
 - [ ] Monthly → Daily puts the money on today
 - [ ] Layout holds at a narrow window; tooltips readable in both themes
+- [ ] Budget vs Actual renders under Budgets (unfiltered: four pairs, not five)
+- [ ] Upcoming Recurring renders under Recurring, beside the Fixed Costs card
+- [ ] Nine cards in two tidy rows of four and a bit — none blank
 
 ### §8 The ledger underneath
 - [ ] Six Journal Entries, all Submitted, debits == credits
@@ -263,7 +394,7 @@ so a hard reload of the workspace is all it needs.
 - [ ] A pasted TXN URL is **Not permitted**
 - [ ] ❌ Any `Desk Test` or `Demo Household` row visible to them is a **security bug** — stop and record it
 
-### §13 Goals *(new)*
+### §13 Goals *(new 2026-08-17)*
 - [ ] Six goals save; the form's fields change per type (Target Percent, Target Account,
       Measure Basis, and the Category description rewriting itself)
 - [ ] The progress table matches: 90% Achieved · 303.33% Achieved · 83.33% **Missed** ·
@@ -281,8 +412,52 @@ so a hard reload of the workspace is all it needs.
 - [ ] Pausing `DT First Lakh` → card **4 of 5**, chart five bars; unpaused again
 - [ ] Colours read sensibly in **both light and dark** — the bar uses `var(--green-500)` etc.
 
-### §14 Cleanup *(optional)*
-- [ ] Goals deleted before accounts and categories
+### §14 Budgets *(new 2026-08-19)*
+- [ ] Three envelopes save; Category link offers **only expense** categories and **does** offer
+      the group `DT Food`
+- [ ] `DT Food Budget` and `DT Tight Cap` coexist — parent cap plus a tighter child cap
+- [ ] The **This Period** block reads 75.0% Within Budget · 90.0% Nearing Limit ·
+      112.5% Over Budget, all three over the same **4,500**
+- [ ] `DT Food Budget` reads **4,500 not zero** — the group rolls its subtree up
+- [ ] `DT Everything` reads **4,500** with no category, and the transfer and card payment are
+      **not** in it
+- [ ] #3's bar is clamped full while the text still says 112.5% and **−500 over**
+- [ ] Pace marker sits at the far right — the window is closed
+- [ ] `send_budget_alerts` raises **two** bell notifications, to the tracker's owner
+- [ ] Running it **again** raises none; dropping #1 to 4,000 raises one (a new fact)
+- [ ] Demo `Eating Out`: **2,400 of 5,400**, **2,400 carried in**, Within Budget 44.44%
+- [ ] Its history strip draws the earlier periods against the dashed envelope line
+- [ ] Rollover off → *2,400 of 3,000*, carried-in line gone; back on again
+- [ ] All six refusals fire with the documented wording
+- [ ] Same category on a **Yearly** clock saves; a **Paused** duplicate saves
+- [ ] Filtered to `Desk Test`: **Budgets on Track 1 of 3**, Budget vs Actual **three pairs**
+- [ ] Chart funnel has Tracker / Status / Period, Period defaulting to Monthly; `Yearly` → no bars
+
+### §15 Recurring transactions *(new 2026-08-20)*
+- [ ] Four plans save; the Type dropdown offers **four** options and no `Refund`
+- [ ] Transfer hides Category / shows Destination Account, and retyping clears the other one
+- [ ] Two plans on one category both save (the opposite of a budget's duplicate refusal)
+- [ ] All four read **Due** on the day they are made, with today as the headline
+- [ ] **Post Due Now** posts one each; the block turns **Scheduled**, headline next month
+- [ ] The date-pill strip links to the transaction, which names the plan and is read-only
+- [ ] `DT Power Bill`'s occurrence is a **Draft** with no Journal Entry (orange pill)
+- [ ] Post Due Now again → *Nothing is due yet.*
+- [ ] `DT Bank` **80,500** · `DT SBI` **9,000** (the draft moved nothing)
+- [ ] The nightly job posts **nothing** and raises no notification
+- [ ] Cancelling an occurrence: struck-through red pill, *1 cancelled*, still **not** `Due`,
+      and Post Due Now still refuses — cancelling is a decision
+- [ ] Pausing hides the button and reads **Paused**, with nothing due
+- [ ] Start Date on the 31st rewrites the field's own description with the clamp rule
+- [ ] All eight refusals fire with the documented wording, group category included
+- [ ] Category link filtered by tracker, by side of the books, and never the group
+- [ ] Deleting a plan keeps its transaction, submitted, with the link cleared
+- [ ] Filtered to `Desk Test`: **Fixed Costs 9,200** · **Plans Running 2 of 3**
+- [ ] Upcoming Recurring: current month **zero on both series**, six bars, funnel has
+      Tracker / Status / Months Ahead
+- [ ] Unfiltered: **Fixed Costs 39,699** · **Plans Running 5 of 5**
+
+### §16 Cleanup *(optional)*
+- [ ] Goals, budgets and plans deleted before accounts and categories
 - [ ] ERPNext accounts and cancelled JEs deliberately left behind
 
 ---

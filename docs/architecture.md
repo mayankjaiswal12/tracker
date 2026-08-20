@@ -111,6 +111,7 @@ reconciliation.
 | **Tracker** — `TRK-00001` | Whose books these are. Registered as an ERPNext **Accounting Dimension**, so it is stamped on every GL row and every standard report can be filtered by it — which is why the app contains no per-user reporting code at all. |
 | **Money Goal** — `GOL-00001` | A target and a window — save this much, keep under that, reach this net worth. Stores **no progress**: every figure is measured from the ledger on read, so cancelling a transaction cannot leave a counter stranded. |
 | **Money Budget** — `BGT-00001` | An envelope that refills every period. Not a goal: a goal is one window with a deadline, a budget *repeats*, and carries a Period and a Rollover that a goal deliberately has not got. Stores no spending either. |
+| **Money Recurring Transaction** — `RTX-00001` | A Transaction template plus a schedule — and **the first thing in the app that writes money on its own**. Stores nothing about what it has posted: every generated transaction links back, so the ledger answers "has September been posted?". |
 | **Money Settings** — Single | The one place a company, base currency, cost centre and chart-of-accounts parents are resolved. Nothing in the app hardcodes any of them. |
 | **Leg** — `posting/leg.py` | One side of an entry: an account and either a debit or a credit, never both. A frozen dataclass that refuses to exist in an invalid state. |
 | **Strategy** — `posting/strategies/` | The accounting rule for one transaction type, as a pure function returning legs. One module each. |
@@ -161,6 +162,14 @@ identically on Frappe's select validation.
 - **Balances are scoped by Tracker, not just by account.** One ERPNext Account is shared by
   every tracker using the same account name, so a query filtered by account alone sums
   other people's money.
+- **Nothing posts for a date before it existed.** A recurring plan generates from the later
+  of its start date and its own creation date — otherwise a plan written down today for a
+  rent that started in April would post five months of rent on top of the five somebody had
+  already typed.
+- **An occurrence is handled if a transaction carries its date**, whatever state that
+  transaction is in. A draft counts, because somebody is meant to be looking at it; a
+  cancelled one counts too, because cancelling is a decision and re-posting it the next
+  morning would overrule it nightly.
 - **Money arithmetic uses `flt` with precision-based comparison**, matching ERPNext's own
   idiom rather than fighting it.
 
@@ -183,11 +192,12 @@ moneytracker/money_tracker/
     trends.py       per-period income and expense series, behind both trend charts
     goals.py        GOAL_TYPES — one measure per kind of goal, all derived on read
     budgets.py      PERIODS — the envelope calendar, the rollover and the alert job
+    recurring.py    FREQUENCIES — the schedule, the generator and the nightly job
     settings.py     accessors for Money Settings
     fx.py           currency conversion, over ERPNext's Currency Exchange
   api/              whitelisted endpoints, incl. the dashboard number cards
-  number_card/      the seven shipped Number Card fixtures
-  dashboard_chart/  the four shipped charts, over three Dashboard Chart Sources
+  number_card/      the nine shipped Number Card fixtures
+  dashboard_chart/  the five shipped charts, over four Dashboard Chart Sources
   demo.py           the demo household — seed and teardown, bench execute only
   permissions.py    row-level security — the only user isolation there is
   workspace/        the Desk workspace
@@ -199,26 +209,40 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is complete; Phase 2 has goals and budgets. All of it is covered by **426 tests**
-(`bench --site tracker.localhost run-tests --app moneytracker`).
+Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions. All of it is
+covered by **523 tests** (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
 | **5** | posting strategies implemented, of fourteen declared types |
-| **7** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets |
-| **4** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual |
+| **9** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs |
+| **5** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual, upcoming recurring |
 | **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
 | **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
+| **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES` |
 | **38** | categories seeded for a new tracker, as a two-level tree |
 
-Goals and budgets share one habit with `Money Account.current_balance`: **they store nothing
-they could derive**. A stored counter drifts the first time a transaction is cancelled, and
-nothing in the data says that it has. The one exception is a budget's `last_alert`, which is
-bookkeeping about a message that was sent rather than anything about the money.
+Goals, budgets and plans share one habit with `Money Account.current_balance`: **they store
+nothing they could derive**. A stored counter drifts the first time a transaction is
+cancelled, and nothing in the data says that it has. The one exception is a budget's
+`last_alert`, which is bookkeeping about a message that was sent rather than anything about
+the money — a plan does not need even that, because the transactions it created *are* the
+record of what it has done.
+
+One thing changed shape with recurring transactions: until them, everything in Phase 2 only
+**read** the ledger. A budget measures spending, a goal measures progress, a card totals a
+window — none of them can be wrong at 3am, because none of them runs at 3am. A plan does, and
+that is where its rules come from: every check the posting engine would eventually make is
+made at Save instead, while there is still somebody there to read the message; nothing is
+posted for a date before the plan itself existed, so a schedule cannot duplicate history
+somebody typed by hand; and one plan's failure inside the nightly job rolls back that plan
+alone.
 
 A demo household (`money_tracker/demo.py`, run from `bench execute`) seeds six months of
-deterministic transactions, one goal of every type and five budgets, and removes them again,
-so the app can be shown in the state it is meant to be used in. The frontend is deliberately
-deferred — Phase 1 is the backend and Desk only.
+deterministic transactions, one goal of every type, five budgets and five standing orders,
+and removes them again, so the app can be shown in the state it is meant to be used in. The
+standing orders **adopt** the transactions the plan table already posted rather than posting
+them twice, which is why they open with a real history and nothing due. The frontend is
+deliberately deferred — Phase 1 is the backend and Desk only.
 
 See `CLAUDE.md` for working conventions and `task.md` for the current resume point.
