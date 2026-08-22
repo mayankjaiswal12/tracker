@@ -28,6 +28,7 @@
   "details_section",
   "merchant",
   "payee",
+  "tags",
   "column_break_details",
   "is_reimbursable",
   "is_tax_deductible",
@@ -188,6 +189,14 @@
    "label": "Payee"
   },
   {
+   "allow_on_submit": 1,
+   "description": "Labels that cut across categories. A transaction has one category but may carry several tags, so tag totals overlap and do not add up to total spending. Editable after submission — a tag is a label, not money.",
+   "fieldname": "tags",
+   "fieldtype": "Table MultiSelect",
+   "label": "Tags",
+   "options": "Money Transaction Tag"
+  },
+  {
    "fieldname": "column_break_details",
    "fieldtype": "Column Break"
   },
@@ -256,7 +265,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-20 10:00:00.000000",
+ "modified": "2026-08-22 10:05:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Transaction",

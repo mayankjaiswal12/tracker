@@ -7,7 +7,8 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 from moneytracker.money_tracker.posting import engine
-from moneytracker.money_tracker.services import fx, settings as settings_service
+from moneytracker.money_tracker.services import fx
+from moneytracker.money_tracker.services import settings as settings_service
 
 # Types where `destination_account` is the other side of the movement rather than a category.
 ACCOUNT_TO_ACCOUNT_TYPES = ("Transfer", "Credit Card Payment")
@@ -26,6 +27,7 @@ class Transaction(Document):
 		self.validate_amount()
 		self.validate_accounts()
 		self.validate_category()
+		self.validate_tags()
 		self.set_base_amount()
 
 	def validate_amount(self):
@@ -60,10 +62,56 @@ class Transaction(Document):
 				_("{0} is a group category. Post to one of its sub-categories instead.").format(category_name)
 			)
 
+	def validate_tags(self):
+		"""Tags must belong to this tracker, and each may appear once.
+
+		Checked at Save rather than at submit, unlike the category: a tag never reaches the
+		ledger, so the posting engine would not catch a stray one — nothing downstream would,
+		and it would surface much later as a tag total quietly mixing two households.
+
+		A duplicated row is dropped rather than refused. It is a double-click on a multiselect,
+		not a decision worth interrupting somebody over, and left alone it would count the same
+		transaction twice in that tag's total.
+		"""
+		if not self.tags:
+			return
+
+		seen = {}
+		for row in self.tags:
+			seen.setdefault(row.tag, row)
+		if len(seen) != len(self.tags):
+			self.tags = list(seen.values())
+			for idx, row in enumerate(self.tags, start=1):
+				row.idx = idx
+
+		owners = frappe.get_all(
+			"Money Tag",
+			filters={"name": ["in", list(seen)]},
+			fields=["name", "tag_name", "tracker"],
+		)
+		for tag in owners:
+			if tag.tracker and tag.tracker != self.tracker:
+				frappe.throw(_("Tag {0} belongs to another tracker.").format(frappe.bold(tag.tag_name)))
+
 	def set_base_amount(self):
 		base_amount, rate = fx.to_base_currency(self.amount, self.currency, self.date, self.exchange_rate)
 		self.exchange_rate = rate
 		self.base_amount = base_amount
+
+	def on_update_after_submit(self):
+		"""Tags are the one thing on a submitted transaction that may still change.
+
+		`tags` carries `allow_on_submit`, and it is the only field on this doctype that does.
+		A submitted transaction is immutable because its money is already in the ledger — but a
+		tag reaches no `GL Entry`, no `Journal Entry` and no account, so freezing it protects
+		nothing and costs the main thing tags are for: you come back from a holiday and label
+		the fortnight you have already entered. The category cannot work that way, because each
+		leaf owns a ledger account and changing it would move real money.
+
+		Frappe does not run `validate` on an update-after-submit, so the check is re-run here
+		rather than trusted to have happened at insert.
+		"""
+		self.validate_tags()
 
 	def before_submit(self):
 		engine.check_sufficient_balance(self)

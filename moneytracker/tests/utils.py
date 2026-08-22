@@ -153,6 +153,29 @@ def make_budget(tracker=None, **kwargs):
 	return doc
 
 
+def make_tag(tracker=None, **kwargs):
+	"""A tag on `tracker`. Names are minted unique because they are unique per tracker."""
+	kwargs.setdefault("tag_name", unique("Tag"))
+
+	doc = frappe.get_doc({"doctype": "Money Tag", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def tag_transaction(transaction, *tags):
+	"""Put `tags` on an already-submitted transaction and return it reloaded.
+
+	Goes through `save()` rather than `db_set` on purpose: `tags` is the only field on
+	Transaction carrying `allow_on_submit`, and the controller re-validates it in
+	`on_update_after_submit`. A test that wrote the rows directly would skip the rule it is
+	usually there to exercise.
+	"""
+	doc = transaction if hasattr(transaction, "doctype") else frappe.get_doc("Transaction", transaction)
+	doc.set("tags", [{"tag": tag.name if hasattr(tag, "name") else tag} for tag in tags])
+	doc.save(ignore_permissions=True)
+	return doc
+
+
 def make_recurring(tracker=None, **kwargs):
 	"""A standing plan on `tracker`. A monthly 1,000 expense unless told otherwise.
 

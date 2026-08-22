@@ -11,6 +11,8 @@ import frappe
 from frappe import _
 from frappe.utils import today
 
+from moneytracker.money_tracker.services import tags as tags_service
+
 
 def _create(transaction_type, **kwargs):
 	doc = frappe.get_doc(
@@ -106,6 +108,7 @@ def search_transactions(
 	tracker=None,
 	account=None,
 	category=None,
+	tags=None,
 	transaction_type=None,
 	from_date=None,
 	to_date=None,
@@ -122,6 +125,14 @@ def search_transactions(
 		filters["account"] = account
 	if category:
 		filters["category"] = category
+	if tags:
+		# Resolved to names first rather than filtered on the child table inline, because the
+		# filters here are a dict and a child-table filter needs list form. Two queries, and
+		# the second one leaves every other filter working exactly as it did.
+		tagged = tags_service.get_tagged_transactions(tags, tracker)
+		if not tagged:
+			return []
+		filters["name"] = ["in", tagged]
 	if transaction_type:
 		filters["transaction_type"] = transaction_type
 	if from_date and to_date:

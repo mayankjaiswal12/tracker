@@ -516,6 +516,11 @@ def _post_occurrence(plan, date):
 			"notes": plan.notes,
 			"is_reimbursable": plan.is_reimbursable,
 			"is_tax_deductible": plan.is_tax_deductible,
+			# Tags come from the plan, so a standing order's occurrences are all labelled the
+			# same way without anybody retagging them twelve times a year. Copied as values
+			# rather than shared: retagging the plan changes what it posts next month, not what
+			# it already posted, which is the same rule the amount follows.
+			"tags": [{"tag": row.tag} for row in (plan.tags or [])],
 			# The back-link that makes every count above derivable, and that lets the ledger
 			# explain itself: this rent is not a one-off somebody typed, it came from a plan.
 			"recurring_transaction": plan.name,
