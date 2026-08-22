@@ -12,15 +12,15 @@ green *and* it has been looked at in Desk.
 
 | | |
 |---|---|
-| Branch | `feat/phase-3-splits` |
-| Tests | **617 green**, ~73s |
+| Branch | `feat/phase-3-transfer-fees` |
+| Tests | **639 green**, ~77s |
 | Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`) |
-| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits** |
+| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits · A1.5 transfer fees** |
 | **Blocking** | **The manual Desk pass — owed since Phase 1, deferred four times** |
 
 ### The one thing owed
 
-The manual Desk pass (`docs/manual-test-desk.md`). 617 automated tests say the arithmetic is
+The manual Desk pass (`docs/manual-test-desk.md`). 639 automated tests say the arithmetic is
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
@@ -32,6 +32,7 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 | Module | Date | Branch | Tests |
 |---|---|---|---|
+| Transfer & card-payment fees | 2026-08-22 | `feat/phase-3-transfer-fees` | ✅ tests, Desk unseen |
 | `Money Transaction Split` — one payment, several categories | 2026-08-22 | `feat/phase-3-splits` | ✅ tests, Desk unseen |
 | `Money Merchant` — who the money went to | 2026-08-22 | `feat/phase-3-merchants` | ✅ tests, Desk unseen |
 | `Money Tag` — labels that cut across categories | 2026-08-22 | `feat/phase-3-tags` | ✅ tests, Desk unseen |
@@ -61,7 +62,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | A1.2 | Receipts and attachments | ⬜ | | OCR-ready columns filled by nothing until B5 |
 | A1.3 | Merchant master | 🟡 | `feat/phase-3-merchants` | Code + 36 tests green; **Desk unseen**. `Data → Link` done; patch linked 49 refs to 12 records |
 | A1.4 | Split transactions | 🟡 | `feat/phase-3-splits` | Code + 25 tests green; **Desk unseen**. Engine untouched, as designed |
-| A1.5 | Transfer fees | ⬜ | | Third leg in `strategies/transfer.py` |
+| A1.5 | Transfer fees | 🟡 | `feat/phase-3-transfer-fees` | Code + 22 tests green; **Desk unseen**. Restated the balance-sheet-only invariant |
 | A1.6 | Reconciliation | ⬜ | | `reference_no`, `is_reconciled`, `cleared_date` |
 | A1.7 | Bills and reminders | ⬜ | | A bill is a claim; a plan is a schedule |
 
@@ -106,6 +107,21 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from A1.5 (transfer fees)
+
+- **A documented invariant had to be restated, not worked around.** "Transfers and card
+  payments touch only balance-sheet accounts" was true and is now too strong: a fee is
+  spending, because the bank kept it. `docs/architecture.md` now says the *movement* is
+  balance-sheet only, and names the fee as the deliberate exception.
+- **The source pays `amount + fee`; the destination receives `amount`.** Netting the fee out
+  of what arrives would leave both balances right and understate expenses.
+- **Third aggregation site in three modules.** Splits and fees both attach money to a category
+  from a voucher whose own `category` is empty, and both had to be added to
+  `get_category_totals` *and* `get_net_spend_by_date`. Any future way of attaching money to a
+  category needs the same two edits — that is now a pattern worth watching, not a coincidence.
 
 ---
 
@@ -183,6 +199,7 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-22 | A1.5 transfer fees shipped; 639 tests. Restated the balance-sheet-only invariant in architecture.md. |
 | 2026-08-22 | A1.4 splits shipped; 617 tests. Category roll-ups and budgets made split-aware; fixed a whole-tracker budget double-count. |
 | 2026-08-22 | A1.3 merchants shipped; 592 tests. `Transaction.merchant` Data → Link, backfilled by `patches/v1_1/link_merchants`. Fixed a remark regression and a silently-broken merchant search. |
 | 2026-08-22 | A1.1 tags shipped; 556 tests. Also fixed a Desk write-back that had left the workspace DB row at `col: 12` with a newer `modified` than the file, so migrate skipped it. |

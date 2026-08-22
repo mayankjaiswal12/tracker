@@ -3,6 +3,9 @@
 
 import frappe
 from frappe import _
+from frappe.utils import flt
+
+from moneytracker.money_tracker.posting.leg import Leg
 
 
 class PostingContext:
@@ -29,6 +32,14 @@ class PostingContext:
 		# Resolved here for the same reason `category` is: a strategy states an accounting rule
 		# and touches no database. A split transaction has no single category, so `self.category`
 		# is None and these carry the breakdown instead.
+		# A fee is money that does not arrive: the destination gets `amount`, the source loses
+		# `amount + fee`, and the difference is an expense like any other.
+		self.fee_amount = flt(transaction.get("fee_amount"))
+		self.fee_category = (
+			frappe.get_cached_doc("Category", transaction.fee_category)
+			if self.fee_amount and transaction.get("fee_category")
+			else None
+		)
 		self.splits = [
 			frappe._dict(
 				category=frappe.get_cached_doc("Category", row.category),
@@ -51,6 +62,21 @@ class PostingContext:
 		if not self.category.ledger_account:
 			frappe.throw(_("Category {0} has no ledger account.").format(self.category.category_name))
 		return self.category
+
+	def fee_leg(self):
+		"""The fee's own debit, or `None` when there is no fee.
+
+		Returned as a leg rather than folded into the movement because it is not part of it:
+		the money that arrives and the money the bank keeps are two different facts, and only
+		one of them is spending.
+		"""
+		if not self.fee_amount:
+			return None
+		if not self.fee_category:
+			frappe.throw(_("A fee needs a category to be charged to."))
+		if not self.fee_category.ledger_account:
+			frappe.throw(_("Category {0} has no ledger account.").format(self.fee_category.category_name))
+		return Leg(ledger_account=self.fee_category.ledger_account, debit=self.fee_amount)
 
 	def require_splits(self, expected_type):
 		"""The split rows, each checked the way `require_category` checks the single one.

@@ -83,9 +83,16 @@ account — which is why a card balance *grows* where a bank balance shrinks.
 | SBI Bank *(asset)* | 10,000.00 | |
 | HDFC Bank *(asset)* | | 10,000.00 |
 
-Both sides are balance-sheet accounts, so a transfer **cannot** appear as income or
+Both sides are balance-sheet accounts, so the **movement** cannot appear as income or
 expense — not by policy, but by construction. Moving your own money between pockets is the
 classic way a naive tracker double-counts spending.
+
+A fee is the one exception, and it is not a hole in the rule so much as the other half of it.
+Transferring 10,000 with a 50 charge debits the destination 10,000, debits an expense category
+50, and credits the source 10,050: what arrives and what the bank keeps are two different
+facts, and only one of them is spending. Booking the charge as part of the movement would
+leave both balances correct while understating expenses — the hardest kind of wrong to
+notice.
 
 ### Refund — ₹300 refunded against that bill
 
@@ -152,8 +159,9 @@ identically on Frappe's select validation.
   incremental counter drifts and gives no sign that it has.
 - **Debits equal credits, checked before anything is written.** ERPNext revalidates on
   submit, but then the error names a Journal Entry the user has never heard of.
-- **Transfers and credit-card payments touch only balance-sheet accounts**, so they can
-  never surface as income or expense.
+- **The movement in a transfer or credit-card payment touches only balance-sheet accounts**,
+  so it can never surface as income or expense. An explicitly entered *fee* is the exception
+  and is expense, because the bank kept it.
 - **A refund credits the category**, it is not income.
 - **History is reversed, not erased.** Cancelling writes reversing GL rows; `on_trash`
   blocks deleting a posted transaction.

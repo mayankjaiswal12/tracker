@@ -23,16 +23,27 @@ def build_legs(ctx):
 
 	if not coa.is_liability(card.account_type):
 		frappe.throw(
-			_("Destination Account {0} is a {1}, not a liability. A card payment must settle a liability.").format(
-				card.account_name, card.account_type
-			)
+			_(
+				"Destination Account {0} is a {1}, not a liability. A card payment must settle a liability."
+			).format(card.account_name, card.account_type)
 		)
 	if coa.is_liability(ctx.account.account_type):
 		frappe.throw(
 			_("Paying a {0} from another liability account is not supported.").format(card.account_type)
 		)
 
-	return [
-		Leg(ledger_account=card.ledger_account, debit=ctx.amount, money_account=card.name),
-		Leg(ledger_account=ctx.account.ledger_account, credit=ctx.amount, money_account=ctx.account.name),
-	]
+	fee = ctx.fee_leg()
+
+	legs = [Leg(ledger_account=card.ledger_account, debit=ctx.amount, money_account=card.name)]
+	if fee:
+		# A convenience charge for paying the card. The card is settled by `amount`; the
+		# charge is expense, for the same reason a transfer fee is.
+		legs.append(fee)
+	legs.append(
+		Leg(
+			ledger_account=ctx.account.ledger_account,
+			credit=ctx.amount + ctx.fee_amount,
+			money_account=ctx.account.name,
+		)
+	)
+	return legs

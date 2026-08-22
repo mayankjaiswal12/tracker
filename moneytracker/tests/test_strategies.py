@@ -38,7 +38,13 @@ def fake_category(name="Food", category_type="Expense", ledger_account=None):
 
 
 def build_context(
-	amount=1000, account=None, category=None, destination=None, transaction_type="Expense", splits=None
+	amount=1000,
+	account=None,
+	category=None,
+	destination=None,
+	transaction_type="Expense",
+	splits=None,
+	fee=None,
 ):
 	"""A PostingContext with its lookups pre-resolved instead of read from the database.
 
@@ -52,6 +58,9 @@ def build_context(
 	ctx.account = account or fake_account()
 	ctx.destination_account = destination
 	ctx.category = category
+	fee_category, fee_amount = fee or (None, 0)
+	ctx.fee_amount = fee_amount
+	ctx.fee_category = fee_category
 	# A split transaction carries no single category; these hold the breakdown instead.
 	ctx.splits = [frappe._dict(category=category, amount=amount) for category, amount in (splits or [])]
 	return ctx
@@ -352,3 +361,65 @@ class TestSplitLegs(unittest.TestCase):
 	def test_no_splits_still_takes_the_single_category_path(self):
 		legs = strategies.get_strategy("Expense")(build_context(amount=100, category=fake_category("Food")))
 		self.assertEqual(len(legs), 2)
+
+
+class TestFeeLegs(unittest.TestCase):
+	"""A fee is the one part of a movement that is spending."""
+
+	def test_a_transfer_fee_is_debited_and_the_source_pays_both(self):
+		legs = strategies.get_strategy("Transfer")(
+			build_context(
+				amount=10000,
+				transaction_type="Transfer",
+				destination=fake_account("SBI"),
+				fee=(fake_category("Bank Charges"), 50),
+			)
+		)
+		self.assertEqual(len(legs), 3)
+		self.assertEqual([leg.debit for leg in legs if leg.debit], [10000, 50])
+		credits = [leg for leg in legs if leg.credit]
+		self.assertEqual(credits[0].credit, 10050, "the source loses the amount plus the fee")
+		engine.validate_balanced(legs)
+
+	def test_the_destination_receives_the_amount_not_the_amount_less_the_fee(self):
+		legs = strategies.get_strategy("Transfer")(
+			build_context(
+				amount=10000,
+				transaction_type="Transfer",
+				destination=fake_account("SBI"),
+				fee=(fake_category("Bank Charges"), 50),
+			)
+		)
+		arriving = next(leg for leg in legs if leg.ledger_account == "SBI - T")
+		self.assertEqual(arriving.debit, 10000)
+
+	def test_a_card_payment_fee_works_the_same_way(self):
+		legs = strategies.get_strategy("Credit Card Payment")(
+			build_context(
+				amount=1000,
+				transaction_type="Credit Card Payment",
+				destination=fake_account("Card", account_type="Credit Card"),
+				fee=(fake_category("Bank Charges"), 20),
+			)
+		)
+		self.assertEqual(len(legs), 3)
+		self.assertEqual(next(leg for leg in legs if leg.credit).credit, 1020)
+		engine.validate_balanced(legs)
+
+	def test_no_fee_leaves_the_movement_exactly_as_it_was(self):
+		legs = strategies.get_strategy("Transfer")(
+			build_context(amount=10000, transaction_type="Transfer", destination=fake_account("SBI"))
+		)
+		self.assertEqual(len(legs), 2)
+		self.assertEqual(next(leg for leg in legs if leg.credit).credit, 10000)
+
+	def test_a_fee_without_a_category_is_refused_at_posting_too(self):
+		with self.assertRaises(frappe.ValidationError):
+			strategies.get_strategy("Transfer")(
+				build_context(
+					amount=100,
+					transaction_type="Transfer",
+					destination=fake_account("SBI"),
+					fee=(None, 5),
+				)
+			)

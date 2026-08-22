@@ -132,6 +132,35 @@ def _split_rows(tracker, types, from_date=None, to_date=None, categories=None):
 	)
 
 
+def _fee_rows(tracker, from_date=None, to_date=None, categories=None):
+	"""Transfer and card-payment fees as `(fee_category, date, fee_base_amount)`.
+
+	A fee is charged on an account-to-account movement, whose own `category` is empty by
+	construction — so like a split, it is invisible to every query that groups by category and
+	would go missing from the roll-up and from every budget. Always spending, never a refund,
+	so no `net_sign` is involved.
+	"""
+	filters = {
+		"tracker": tracker,
+		"docstatus": 1,
+		"fee_amount": [">", 0],
+		"fee_category": ["is", "set"],
+	}
+	if from_date and to_date:
+		filters["date"] = ["between", [from_date, to_date]]
+	if categories is not None:
+		if not categories:
+			return []
+		filters["fee_category"] = ["in", list(categories)]
+
+	return frappe.get_all(
+		"Transaction",
+		filters=filters,
+		fields=["fee_category", "date", "SUM(fee_base_amount) as total"],
+		group_by="fee_category, date",
+	)
+
+
 def get_category_totals(tracker, category_type="Expense", from_date=None, to_date=None):
 	"""Every category on the tracker with its own total and its total including descendants.
 
@@ -175,6 +204,11 @@ def get_category_totals(tracker, category_type="Expense", from_date=None, to_dat
 		own[row.split_category] = flt(own.get(row.split_category, 0.0)) + net_sign(
 			row.transaction_type
 		) * flt(row.split_base_amount)
+
+	# A transfer fee is expense charged to a category, on a voucher that carries no category.
+	if category_type == "Expense":
+		for row in _fee_rows(tracker, from_date, to_date, categories=names):
+			own[row.fee_category] = flt(own.get(row.fee_category, 0.0)) + flt(row.total)
 
 	result = []
 	for category in categories:
@@ -251,6 +285,12 @@ def get_net_spend_by_date(tracker, category=None, from_date=None, to_date=None):
 		by_date[day] = flt(by_date.get(day, 0.0)) + net_sign(row.transaction_type) * flt(
 			row.split_base_amount
 		)
+
+	# And fees, which a budget on Bank Charges is precisely there to catch. The main query
+	# above cannot see them: it filters on SPEND_TYPES, and a Transfer is not one.
+	for row in _fee_rows(tracker, from_date, to_date, categories=subtree if category else None):
+		day = getdate(row.date)
+		by_date[day] = flt(by_date.get(day, 0.0)) + flt(row.total)
 	return by_date
 
 

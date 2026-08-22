@@ -34,6 +34,7 @@ class Transaction(Document):
 		# After `set_base_amount`, which is where `exchange_rate` is resolved — each split row
 		# is stamped with its own base amount at that rate.
 		self.validate_splits()
+		self.validate_fee()
 
 	def apply_merchant_defaults(self):
 		"""Let the merchant fill in what has been left blank, and nothing else.
@@ -163,6 +164,51 @@ class Transaction(Document):
 
 		# Last, so the checks above still had the single category available to compare against.
 		self.category = None
+
+	def validate_fee(self):
+		"""A fee belongs to a movement between accounts, and is expense wherever it lands.
+
+		Only Transfer and Credit Card Payment can carry one: every other type already has a
+		category of its own, and a "fee" on an expense is simply part of the expense.
+
+		Like the split rows, `fee_base_amount` is stamped at the transaction's own rate, so
+		this runs after `set_base_amount` too.
+		"""
+		if not flt(self.fee_amount):
+			self.fee_amount = 0
+			self.fee_category = None
+			self.fee_base_amount = 0
+			return
+
+		if self.transaction_type not in ACCOUNT_TO_ACCOUNT_TYPES:
+			frappe.throw(
+				_(
+					"Only a Transfer or a Credit Card Payment carries a fee. A charge on a {0} is part of it."
+				).format(self.transaction_type)
+			)
+		if flt(self.fee_amount) < 0:
+			frappe.throw(_("Fee Amount cannot be negative."))
+		if not self.fee_category:
+			frappe.throw(_("A fee is spending, so it needs an expense category to be charged to."))
+
+		category = frappe.db.get_value(
+			"Category",
+			self.fee_category,
+			["tracker", "category_type", "is_group", "category_name"],
+			as_dict=True,
+		)
+		if category.tracker and category.tracker != self.tracker:
+			frappe.throw(_("Category {0} belongs to another tracker.").format(category.category_name))
+		if category.is_group:
+			frappe.throw(
+				_("{0} is a group category. Charge the fee to one of its sub-categories.").format(
+					category.category_name
+				)
+			)
+		if category.category_type != "Expense":
+			frappe.throw(_("{0} is an income category. A fee is spending.").format(category.category_name))
+
+		self.fee_base_amount = flt(self.fee_amount) * (flt(self.exchange_rate) or 1.0)
 
 	def validate_tags(self):
 		"""Tags must belong to this tracker, and each may appear once.
