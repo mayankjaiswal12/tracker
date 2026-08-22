@@ -11,6 +11,7 @@ because it is the wiring in hooks.py that has to hold as much as the logic.
 
 import frappe
 
+from moneytracker import hooks
 from moneytracker.money_tracker import permissions
 from moneytracker.tests.utils import (
 	MoneyTrackerTestCase,
@@ -22,7 +23,11 @@ from moneytracker.tests.utils import (
 	make_user,
 )
 
-SCOPED_DOCTYPES = ("Transaction", "Money Account", "Category")
+# Derived from the hooks rather than typed out, so a new tracker-scoped DocType is covered
+# by the isolation tests below the moment it is registered — and so a DocType that was added
+# to one hook dict and forgotten in the other fails `test_every_scoped_doctype_is_in_both_hooks`
+# instead of quietly becoming readable by everybody on the site.
+SCOPED_DOCTYPES = tuple(doctype for doctype in hooks.permission_query_conditions if doctype != "Tracker")
 
 
 class PermissionFixture(MoneyTrackerTestCase):
@@ -69,6 +74,17 @@ class TestListIsolation(PermissionFixture):
 		with as_user(self.stranger):
 			for doctype in (*SCOPED_DOCTYPES, "Tracker"):
 				self.assertEqual(frappe.get_list(doctype, pluck="name"), [], doctype)
+
+	def test_every_scoped_doctype_is_in_both_hooks(self):
+		"""A DocType in one dict and not the other is half-secured, which is not secured.
+
+		`permission_query_conditions` hides it from a list; `has_permission` is what stops a
+		pasted URL. CLAUDE.md says every new tracker-scoped DocType goes in both lists, and
+		this is what makes that more than a note.
+		"""
+		self.assertEqual(set(hooks.permission_query_conditions), set(hooks.has_permission), "both hook dicts")
+		for doctype in SCOPED_DOCTYPES:
+			self.assertTrue(frappe.get_meta(doctype).get_field("tracker"), doctype)
 
 	def test_naming_a_document_directly_is_still_denied(self):
 		"""Pasting someone else's URL must not work either — the list filter is not the

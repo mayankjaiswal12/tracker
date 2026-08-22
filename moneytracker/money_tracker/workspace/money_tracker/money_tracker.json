@@ -11,9 +11,17 @@
   {
    "chart_name": "Goal Progress",
    "label": "Goal Progress"
+  },
+  {
+   "chart_name": "Budget vs Actual",
+   "label": "Budget vs Actual"
+  },
+  {
+   "chart_name": "Upcoming Recurring",
+   "label": "Upcoming Recurring"
   }
  ],
- "content": "[{\"id\": \"h0\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Overview</b></span>\", \"col\": 12}}, {\"id\": \"nc1\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Total Balance\", \"col\": 3}}, {\"id\": \"nc2\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Net Worth\", \"col\": 3}}, {\"id\": \"nc3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Income This Month\", \"col\": 3}}, {\"id\": \"nc4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Expenses This Month\", \"col\": 3}}, {\"id\": \"nc5\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Savings Rate\", \"col\": 3}}, {\"id\": \"nc6\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Goals on Track\", \"col\": 3}}, {\"id\": \"sp3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h4\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Trends</b></span>\", \"col\": 12}}, {\"id\": \"ch1\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Income vs Expense\", \"col\": 6}}, {\"id\": \"ch2\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Spending Trend\", \"col\": 6}}, {\"id\": \"sp4\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Goals</b></span>\", \"col\": 12}}, {\"id\": \"ch3\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Goal Progress\", \"col\": 6}}, {\"id\": \"sp0\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"s1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Add Transaction\", \"col\": 3}}, {\"id\": \"s2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transaction\", \"col\": 3}}, {\"id\": \"s3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account\", \"col\": 3}}, {\"id\": \"s4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Category\", \"col\": 3}}, {\"id\": \"s15\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Goal\", \"col\": 3}}, {\"id\": \"sp1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Setup</b></span>\", \"col\": 12}}, {\"id\": \"s5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tracker\", \"col\": 3}}, {\"id\": \"s6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account Group\", \"col\": 3}}, {\"id\": \"s7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Payment Method\", \"col\": 3}}, {\"id\": \"s8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Settings\", \"col\": 3}}, {\"id\": \"sp2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Ledger &amp; Reports</b></span>\", \"col\": 12}}, {\"id\": \"p1\", \"type\": \"paragraph\", \"data\": {\"text\": \"The ledger is ERPNext's. Every transaction posts a balanced Journal Entry, so these standard reports work directly on your data and can be filtered by Tracker.\", \"col\": 12}}, {\"id\": \"s9\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 3}}, {\"id\": \"s10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trial Balance\", \"col\": 3}}, {\"id\": \"s11\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Balance Sheet\", \"col\": 3}}, {\"id\": \"s12\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Profit and Loss Statement\", \"col\": 3}}, {\"id\": \"s13\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cash Flow\", \"col\": 3}}, {\"id\": \"s14\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 3}}]",
+ "content": "[{\"id\": \"h0\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Overview</b></span>\", \"col\": 12}}, {\"id\": \"nc1\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Total Balance\", \"col\": 3}}, {\"id\": \"nc2\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Net Worth\", \"col\": 3}}, {\"id\": \"nc3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Income This Month\", \"col\": 3}}, {\"id\": \"nc4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Expenses This Month\", \"col\": 3}}, {\"id\": \"nc5\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Savings Rate\", \"col\": 3}}, {\"id\": \"nc6\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Goals on Track\", \"col\": 3}}, {\"id\": \"nc7\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Budgets on Track\", \"col\": 3}}, {\"id\": \"mtPlansRunCard\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Plans Running\", \"col\": 3}}, {\"id\": \"sp3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h4\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Trends</b></span>\", \"col\": 12}}, {\"id\": \"ch1\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Income vs Expense\", \"col\": 6}}, {\"id\": \"ch2\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Spending Trend\", \"col\": 6}}, {\"id\": \"sp4\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Goals</b></span>\", \"col\": 12}}, {\"id\": \"ch3\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Goal Progress\", \"col\": 6}}, {\"id\": \"sp5\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h6\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Budgets</b></span>\", \"col\": 12}}, {\"id\": \"ch4\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Budget vs Actual\", \"col\": 6}}, {\"id\": \"sp0\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"mtRecurringHead\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Recurring</b></span>\", \"col\": 12}}, {\"id\": \"mtFixedCostsCard\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Fixed Costs\", \"col\": 3}}, {\"id\": \"mtUpcomingChart\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Upcoming Recurring\", \"col\": 9}}, {\"id\": \"mtRecurringSpacer\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"s1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Add Transaction\", \"col\": 3}}, {\"id\": \"s2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transaction\", \"col\": 3}}, {\"id\": \"s3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account\", \"col\": 3}}, {\"id\": \"s4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Category\", \"col\": 3}}, {\"id\": \"s15\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Goal\", \"col\": 3}}, {\"id\": \"s16\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Budget\", \"col\": 3}}, {\"id\": \"sp1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Setup</b></span>\", \"col\": 12}}, {\"id\": \"s5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tracker\", \"col\": 3}}, {\"id\": \"s6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Account Group\", \"col\": 3}}, {\"id\": \"s7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Payment Method\", \"col\": 3}}, {\"id\": \"s8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Money Settings\", \"col\": 3}}, {\"id\": \"sp2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"h3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Ledger &amp; Reports</b></span>\", \"col\": 12}}, {\"id\": \"p1\", \"type\": \"paragraph\", \"data\": {\"text\": \"The ledger is ERPNext's. Every transaction posts a balanced Journal Entry, so these standard reports work directly on your data and can be filtered by Tracker.\", \"col\": 12}}, {\"id\": \"s9\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 3}}, {\"id\": \"s10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trial Balance\", \"col\": 3}}, {\"id\": \"s11\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Balance Sheet\", \"col\": 3}}, {\"id\": \"s12\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Profit and Loss Statement\", \"col\": 3}}, {\"id\": \"s13\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cash Flow\", \"col\": 3}}, {\"id\": \"s14\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 3}}]",
  "creation": "2026-07-16 17:53:19.250024",
  "custom_blocks": [],
  "docstatus": 0,
@@ -25,7 +33,7 @@
  "is_hidden": 0,
  "label": "Money Tracker",
  "links": [],
- "modified": "2026-08-17 11:00:00.000000",
+ "modified": "2026-08-22 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Money Tracker",
@@ -53,6 +61,18 @@
   {
    "label": "Goals on Track",
    "number_card_name": "Goals on Track"
+  },
+  {
+   "label": "Budgets on Track",
+   "number_card_name": "Budgets on Track"
+  },
+  {
+   "label": "Plans Running",
+   "number_card_name": "Plans Running"
+  },
+  {
+   "label": "Fixed Costs",
+   "number_card_name": "Fixed Costs"
   }
  ],
  "owner": "Administrator",
@@ -94,6 +114,20 @@
    "doc_view": "List",
    "label": "Money Goal",
    "link_to": "Money Goal",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Money Budget",
+   "link_to": "Money Budget",
+   "type": "DocType"
+  },
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "Money Recurring Transaction",
+   "link_to": "Money Recurring Transaction",
    "type": "DocType"
   },
   {

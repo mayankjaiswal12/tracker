@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "TAG-.#####",
+ "creation": "2026-08-22 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "basics_section",
+  "tag_name",
+  "tracker",
+  "is_active",
+  "column_break_basics",
+  "color",
+  "icon",
+  "description_section",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "A label that cuts across categories. A café bill is Eating Out by category and Vacation by tag, and both readings are true at once.",
+   "fieldname": "tag_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tag Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "1",
+   "description": "An inactive tag stays on the transactions that already carry it and stops being offered on new ones.",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "description_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-22 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Tag",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "tag_name"
+}

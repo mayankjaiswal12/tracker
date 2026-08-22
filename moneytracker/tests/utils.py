@@ -18,7 +18,7 @@ from contextlib import contextmanager
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import flt, getdate, nowdate
+from frappe.utils import flt, get_first_day, getdate, nowdate
 
 from moneytracker.money_tracker.services import settings as settings_service
 
@@ -134,6 +134,78 @@ def make_goal(tracker=None, **kwargs):
 	doc = frappe.get_doc({"doctype": "Money Goal", "tracker": tracker, **kwargs})
 	doc.insert(ignore_permissions=True)
 	return doc
+
+
+def make_budget(tracker=None, **kwargs):
+	"""An envelope on `tracker`. Monthly and 10,000 unless told otherwise.
+
+	`start_date` defaults to the *first day of the posting month* rather than to today, so a
+	budget made by a test already covers the transactions that test posts — a budget starting
+	today would measure from today and read zero however much had been spent this month.
+	"""
+	kwargs.setdefault("budget_name", unique("Budget"))
+	kwargs.setdefault("period", "Monthly")
+	kwargs.setdefault("budget_amount", 10000)
+	kwargs.setdefault("start_date", get_first_day(posting_date()))
+
+	doc = frappe.get_doc({"doctype": "Money Budget", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_tag(tracker=None, **kwargs):
+	"""A tag on `tracker`. Names are minted unique because they are unique per tracker."""
+	kwargs.setdefault("tag_name", unique("Tag"))
+
+	doc = frappe.get_doc({"doctype": "Money Tag", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def tag_transaction(transaction, *tags):
+	"""Put `tags` on an already-submitted transaction and return it reloaded.
+
+	Goes through `save()` rather than `db_set` on purpose: `tags` is the only field on
+	Transaction carrying `allow_on_submit`, and the controller re-validates it in
+	`on_update_after_submit`. A test that wrote the rows directly would skip the rule it is
+	usually there to exercise.
+	"""
+	doc = transaction if hasattr(transaction, "doctype") else frappe.get_doc("Transaction", transaction)
+	doc.set("tags", [{"tag": tag.name if hasattr(tag, "name") else tag} for tag in tags])
+	doc.save(ignore_permissions=True)
+	return doc
+
+
+def make_recurring(tracker=None, **kwargs):
+	"""A standing plan on `tracker`. A monthly 1,000 expense unless told otherwise.
+
+	`start_date` defaults to **today** rather than to the first of the month, unlike
+	`make_budget`: a plan never posts for a date before it was created
+	(`recurring.effective_from`), so a back-dated start would produce a fixture that looks
+	overdue and generates nothing. A test that wants catch-up moves `creation` instead — see
+	`backdate_plan`.
+	"""
+	kwargs.setdefault("recurring_name", unique("Plan"))
+	kwargs.setdefault("transaction_type", "Expense")
+	kwargs.setdefault("frequency", "Monthly")
+	kwargs.setdefault("amount", 1000)
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Recurring Transaction", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def backdate_plan(plan, creation):
+	"""Move a plan's `creation` back, so generation may reach dates before the test began.
+
+	`effective_from` is deliberately the later of the start date and the day the plan was
+	written down, which means a freshly inserted fixture can never generate history. Every
+	catch-up test therefore has to say, explicitly, that this plan existed earlier.
+	"""
+	frappe.db.set_value("Money Recurring Transaction", plan.name, "creation", creation, update_modified=False)
+	plan.reload()
+	return plan
 
 
 def make_user(roles=("Finance User",)):

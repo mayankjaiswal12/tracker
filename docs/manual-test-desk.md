@@ -1,10 +1,12 @@
 # Manual test run — Desk
 
-A click-through pass over everything Phase 1 implements, plus the goals that opened Phase 2
-(§13). Every number below is pre-computed and was verified against the ledger — 2026-08-16
-for §1–§12, 2026-08-17 for §13 — so you are checking arithmetic, not recomputing it.
+A click-through pass over everything Phase 1 implements, plus the three features that opened
+Phase 2: goals (§13), budgets (§14) and recurring transactions (§15). Every number below is
+pre-computed and was verified against the ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13,
+2026-08-19 for §14, 2026-08-20 for §15 — so you are checking arithmetic, not recomputing it.
 
-Roughly 30 minutes. Nothing here needs the terminal except the two optional cross-checks.
+Roughly 45 minutes. Nothing here needs the terminal except the alert job in §14, the nightly
+job in §15, and two optional cross-checks.
 
 ---
 
@@ -39,7 +41,8 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 Tracker **Demo Household** and its four accounts are the demo data
 (`money_tracker/demo.py`), seeded 2026-08-16: 67 transactions over 2026-04-01 … 2026-08-15,
-which is what the workspace cards and charts show. Ignore it for the posting steps — this
+seven goals added 2026-08-17, **five budgets added 2026-08-19** and **five standing orders
+added 2026-08-20**, which is what the workspace cards and charts show. Ignore it for the posting steps — this
 run creates its own `DT *` set so the numbers stay clean — and use it in §7, where the point
 is that the widgets read a populated tracker.
 
@@ -214,7 +217,8 @@ posted, so the numbers are the ones from step 6 seen a different way.
 >
 > Unfiltered, against the demo household, the cards read **Total Balance 3,32,550 · Net
 > Worth 2,61,755 · Income This Month 1,20,000 · Expenses This Month 67,899 · Savings Rate
-> 43.4% · Goals on Track 6 of 7** (verified 2026-08-16, goals 2026-08-17). The current month is deliberately part-finished — the
+> 43.4% · Goals on Track 6 of 7 · Budgets on Track 3 of 5** (verified 2026-08-16, goals
+> 2026-08-17, budgets 2026-08-19). The current month is deliberately part-finished — the
 > seeder skips future-dated rows — so those two month figures grow as the month does.
 
 ### The Number Cards
@@ -227,6 +231,7 @@ posted, so the numbers are the ones from step 6 seen a different way.
 | Expenses This Month | **4,500** | 2,000 + 3,000 − 500 refund |
 | Savings Rate | **91.0%** | (50,000 − 4,500) / 50,000 |
 | Goals on Track | **—** | no goals yet; §13 builds them and this becomes **5 of 6** |
+| Budgets on Track | **—** | no budgets yet; §14 builds them and this becomes **1 of 3** |
 
 ✅ **The key check:** Total Balance is 47,500, not 49,500. Every account is reported in its
 natural direction, so the credit card's 2,000 comes back positive; adding it in would show
@@ -238,8 +243,8 @@ string server-side rather than handing the browser a bare number.
 ### The charts
 
 Income vs Expense and Spending Trend are `Custom` charts fed by the `Money Period Totals`
-source, monthly, last year. The third, **Goal Progress**, has its own source and is covered
-in §13.
+source, monthly, last year. The other two each have a source of their own and are covered
+where they belong — **Goal Progress** in §13, **Budget vs Actual** in §14.
 
 - **Income vs Expense** (bar) — two series. This month: Income 50,000, Expense 4,500.
 - **Spending Trend** (line) — the expense series alone.
@@ -544,17 +549,325 @@ what the dashboard is counting. Set it back to `Active`.
 
 ---
 
-## 14. Cleanup (optional)
+## 14. Budgets
+
+**Money Tracker → Money Budget → + Add Money Budget.** Three envelopes over the same six
+transactions. A budget stores **no spending** — like a goal, every figure below is measured
+from the ledger each time you open the form.
+
+A budget is deliberately **not** a Spending Limit goal. A goal is one window with a
+deadline; an envelope *repeats*, and carries two things a goal has not got — a Period that
+refills it, and a Rollover that decides whether last month's leftovers are still there.
+
+Set **Tracker `Desk Test`** on each one, and give every one of them
+**Start Date `2026-08-01`, End Date `2026-08-31`**.
+
+> Why an End Date: a budget is otherwise **live** — it always measures the period containing
+> today, so running this pass in September would read an empty September rather than the
+> August you posted into. The end date clamps the measurement to August's envelope forever,
+> which is the same rule that stops a finished budget opening a fresh clean envelope every
+> month. Everything below is therefore date-independent, like §13.
+
+| # | Budget Name | Period | Amount | Category | Threshold |
+|---|---|---|---|---|---|
+| 1 | `DT Food Budget` | Monthly | 6000 | `DT Food` *(the group)* | 80 |
+| 2 | `DT Tight Cap` | Monthly | 5000 | `DT Groceries` | 80 |
+| 3 | `DT Everything` | Monthly | 4000 | *(leave empty)* | 80 |
+
+✅ The Category link offers **only expense categories**, and it *does* offer `DT Food` even
+though it is a group. That is the point of #1: one envelope over everything filed under it —
+the exact opposite of `Transaction`, which refuses to post to a heading.
+
+✅ #1 and #2 are allowed to coexist: a cap on the parent and a tighter cap on one child is a
+real way to budget. What is refused is two envelopes over the *same* category on the *same*
+clock — see the refusals below.
+
+### The period block
+
+Reload each saved budget. The **This Period** block at the top of the form:
+
+| Budget | Used | Period | Outcome | Footnote reads |
+|---|---|---|---|---|
+| DT Food Budget | **75.0%** | Aug 2026 | Within Budget | 4,500 of 6,000 spent · 1,500 left · 1 days left · 1,500.00 a day left |
+| DT Tight Cap | **90.0%** | Aug 2026 | Nearing Limit | 4,500 of 5,000 spent · 500 left · … |
+| DT Everything | **112.5%** | Aug 2026 | Over Budget | 4,500 of 4,000 spent · -500 over |
+
+The 4,500 is the same figure the Expenses This Month card gives in §7: 2,000 + 3,000 less
+the 500 refund. Three things are worth stopping on:
+
+✅ **#1 reads 4,500, not zero.** Nothing was ever posted to `DT Food` itself — it is a
+heading. The envelope rolls its subtree up.
+
+✅ **#3 reads 4,500 too**, with no category at all. An empty category means the whole
+tracker's spending — and the **transfer and the credit card payment are not in it**. Moving
+your own money about empties no envelope.
+
+✅ **The bar is clamped, the figures are not.** #3's bar is full, and its text still says
+112.5% and *-500 over*. The bar has no more width to give; the number has no reason to lie.
+
+✅ The thin vertical line on the bar is the **pace marker** — how much of the period has
+passed. It sits at the far right here, because the window is closed.
+
+### Alerts
+
+`Notify Me` is on by default, and #2 and #3 have both crossed a line. From a shell:
+
+```bash
+docker exec -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
+  bash -lc 'bench --site tracker.localhost execute moneytracker.money_tracker.services.budgets.send_budget_alerts'
+```
+
+✅ The **bell icon** in Desk's navbar gains two notifications: *"DT Tight Cap is at 90.0% of
+its budget for Aug 2026"* and *"DT Everything is over budget: ₹ 4,500.00 of ₹ 4,000.00 spent
+in Aug 2026"*. They go to the **tracker's owner**, not to whoever ran the job.
+
+✅ It will also alert on the demo household's `Fuel & Commute` and `Household Bills`, which
+are genuinely over and near. That is the job working, not a leak.
+
+✅ **Run it again.** No new notifications. Each budget is stamped with the period and outcome
+it last announced, so the same fact is never told twice. Now open `DT Food Budget`, drop its
+amount to `4000`, save, and run the job once more: it appears, because that is a new fact.
+
+### Rollover — go and look at the demo household
+
+The `DT *` set is one month old, so it has nothing to roll over. Open **Eating Out** on
+`Demo Household` instead, the one demo budget with Rollover ticked (measured 2026-08-19):
+
+✅ Amount **3,000**, but the footnote says **2,400 of 5,400 spent** and **2,400 carried in**.
+Four finished months at 600 left over each. `Within Budget` at 44.44%.
+
+✅ Below the bar, a strip of small columns — **the earlier periods**, against a dashed line
+for the envelope. That strip is the one thing a budget shows that a goal cannot: the same
+envelope, over and over.
+
+✅ Tick Rollover **off** on it and save. The footnote becomes *2,400 of 3,000 spent* and the
+carried-in line vanishes. Tick it back on.
+
+> Rollover carries a **deficit** as well as a surplus — an envelope that quietly forgets last
+> month's overspend is two budgets wearing one name. `Fuel & Commute` would show it if it had
+> rollover on; the automated suite covers it.
+
+### The refusals
+
+Try each; each should be refused on save:
+
+| What you do | Expected |
+|---|---|
+| A budget with Category `DT Salary` | *"DT Salary is an income category. A budget caps spending, so it is set against an expense."* |
+| A **second** Monthly budget on `DT Groceries` | *"DT Tight Cap is already a Monthly budget over the same category…"* |
+| Budget Amount `0` | *"Budget Amount must be greater than zero."* |
+| End Date before Start Date | *"End Date cannot be before Start Date."* |
+| Alert Threshold `150` | *"Alert Threshold must be greater than 0 and no more than 100."* |
+| A second budget named `DT Tight Cap` | *"A budget named DT Tight Cap already exists on this tracker."* |
+
+✅ Now change the second `DT Groceries` budget's **Period to `Yearly`** and save: it goes
+through. A monthly grocery cap inside a yearly one is two different questions about the same
+money, not the same question twice. Delete it again before moving on.
+
+✅ Set `DT Tight Cap`'s **Status to `Paused`**, then try the duplicate Monthly budget again:
+it now saves. A paused envelope is not counting anything, so nothing is double-counted. Undo
+both.
+
+### The dashboard, a third time
+
+Back to **Money Tracker**, with every widget's Tracker filter on `Desk Test`:
+
+✅ **Budgets on Track** reads **1 of 3** — only `DT Food Budget`. `Nearing Limit` and
+`Over Budget` are both warnings, and neither counts as on track.
+
+✅ **Budget vs Actual** draws **three pairs of bars**, largest envelope first — *DT Food
+Budget · DT Tight Cap · DT Everything* — with Budget at 6,000 / 5,000 / 4,000 and Spent at
+4,500 on all three.
+
+✅ Click the funnel: **Tracker**, **Status** and **Period** filters, with Period defaulting
+to `Monthly`. Set it to `Yearly` → **no bars**, because all three are monthly. Blank means
+every period, which puts a weekly envelope next to a yearly one — the reason the filter
+defaults to a single clock rather than to everything.
+
+✅ Unfiltered, against the demo household, the chart shows **four** bars and not five: the
+`Travel Fund` is Yearly, and the default filter is doing its job.
+
+---
+
+## 15. Recurring transactions
+
+**Money Tracker → Money Recurring Transaction → + Add.** Four standing orders over the same
+`Desk Test` books. This is the first thing in the app that **writes** money by itself, so the
+section is about two questions a budget and a goal never raised: does it post the right thing,
+and does it refuse to post the same thing twice.
+
+> **This section posts new money.** §6, §9 and §14 all read differently afterwards, and that is
+> the plan working rather than a finding. Do it after them, as numbered.
+
+Set **Tracker `Desk Test`** on each one and leave **Start Date** at today. Everything below is
+therefore date-independent: an occurrence falls today, and the next falls on the same day of
+next month.
+
+| # | Name | Type | Amount | Account | Category / Destination | When It Runs |
+|---|---|---|---|---|---|---|
+| 1 | `DT Rent Plan` | Expense | 8000 | `DT Bank` | `DT Groceries` | Post Automatically |
+| 2 | `DT Salary Plan` | Income | 50000 | `DT Bank` | `DT Salary` | Post Automatically |
+| 3 | `DT Sweep` | Transfer | 1000 | `DT Bank` | → `DT SBI` | Post Automatically |
+| 4 | `DT Power Bill` | Expense | 1200 | `DT Bank` | `DT Groceries` | **Create as Draft** |
+
+✅ The **Transaction Type** dropdown offers **four** options only — Expense, Income, Transfer,
+Credit Card Payment. `Refund` is missing on purpose: a refund answers one particular expense,
+and a schedule cannot know which one.
+
+✅ Choosing Transfer **hides Category and shows Destination Account**, and choosing Expense
+again hides Destination Account. Retyping a saved plan **clears** the field it just hid.
+
+✅ #1 and #4 both sit on `DT Groceries` and both save. Two plans on one category are normal —
+this is the opposite of `Money Budget`, where a second envelope on the same clock is refused.
+
+### The Schedule block
+
+Reload each saved plan. The block at the top of the form:
+
+| Plan | Headline | Pill | Footnote reads |
+|---|---|---|---|
+| DT Rent Plan | today's date | **Due** | 8,000.00 a month · nothing posted yet · 1 due now, 8,000.00 |
+| DT Salary Plan | today's date | **Due** | 50,000.00 a month · nothing posted yet · 1 due now, 50,000.00 |
+| DT Sweep | today's date | **Due** | 1,000.00 a month · nothing posted yet · 1 due now, 1,000.00 |
+| DT Power Bill | today's date | **Due** | 1,200.00 a month · nothing posted yet · 1 due now, 1,200.00 |
+
+✅ **`Due` is the point.** The occurrence's date has arrived and nothing has posted, because
+the nightly job has not run since you saved. It is not an error and not a mistake of yours —
+it is the one state a money figure could never show you.
+
+✅ The headline is **today**, not next month: `Due` names the occurrence that is owed, and
+`Scheduled` names the one that is next.
+
+### Post Due Now
+
+Each Active plan has a **Post Due Now** button. Press it on all four.
+
+✅ A toast says *Posted 1 transaction(s).* and the block turns **Scheduled**, headline **same
+day next month**, footnote *8,000.00 a month · 1 posted, 8,000.00 in total*.
+
+✅ Below it, a **strip of date pills** — what the plan has posted. Each is a link. Click one:
+the Transaction opens, `Recurring Transaction` on it names the plan, and it is **read-only**.
+
+✅ `DT Power Bill`'s pill is outlined in **orange**, and the transaction it opens is a **Draft**
+with no Journal Entry. That is `Create as Draft`: an electricity bill is a different number
+every month, so posting 1,200 automatically would be inventing the figure.
+
+✅ Press **Post Due Now again** on `DT Rent Plan`: *Nothing is due yet.* Nothing is posted
+twice, and no counter anywhere was consulted — the plan asked the ledger which dates it had
+already dealt with.
+
+✅ **Balances now.** `DT Bank` = 39,500 − 8,000 + 50,000 − 1,000 = **80,500**; `DT SBI` =
+8,000 + 1,000 = **9,000**. The draft moved nothing.
+
+### The nightly job
+
+```bash
+docker exec -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
+  bash -lc 'bench --site tracker.localhost execute moneytracker.money_tracker.services.recurring.run_recurring_transactions'
+```
+
+✅ It prints `{'plans': 9, 'posted': 0, 'failed': 0, 'notified': 0}` — nine plans across the
+site (the four here plus the demo household's five), **nothing posted**. Every occurrence up to today already exists. This is the same job Frappe runs daily.
+
+✅ The **bell icon** gains nothing either: the notification is about transactions that have
+just been created, and none were.
+
+### Cancelling an occurrence
+
+Open the transaction `DT Rent Plan` posted and **Cancel** it.
+
+✅ Back on the plan: the pill for that date is **struck through and outlined in red**, the
+footnote says *nothing posted yet · 1 cancelled*, and the block reads **Scheduled** — not
+`Due`.
+
+✅ Press **Post Due Now**: *Nothing is due yet.* Cancelling is a decision. Re-posting it
+tomorrow morning would overrule that decision nightly, so a cancelled date counts as handled.
+
+### Pausing, and the month-end rule
+
+✅ Set `DT Sweep`'s **Status to `Paused`** and save. The **Post Due Now button disappears**, the
+pill reads **Paused**, and the footnote no longer mentions anything due. A paused plan is
+paused, not behind — anything else would report your own decision back to you as a fault.
+
+✅ Set `DT Power Bill`'s **Start Date to the 31st** of this month (or any month). The Start Date
+field's own description **rewrites itself**: *…so the 31st is kept in every month that has one
+and clamped to the last day in the months that do not.* That is the one thing about the
+schedule nobody expects — occurrences are counted from the start date, so a plan on the 31st
+lands on 28 February and then on **31** March, rather than losing the 31st for good.
+
+### The refusals
+
+Try each; each should be refused on save:
+
+| What you do | Expected |
+|---|---|
+| Amount `0` | *"Amount must be greater than zero."* |
+| End Date before Start Date | *"End Date cannot be before Start Date."* |
+| A second plan named `DT Rent Plan` | *"A recurring transaction named DT Rent Plan already exists on this tracker."* |
+| An Expense plan with no Category | *"Category is required for a Expense."* |
+| An Expense plan on `DT Salary` | *"DT Salary is an Income category, but this plan posts an Expense."* |
+| An Expense plan on `DT Food` *(the group)* | *"DT Food is a group category. Post to one of its sub-categories instead."* |
+| A Transfer with no Destination Account | *"Destination Account is required for a Transfer."* |
+| A Transfer from `DT Bank` to `DT Bank` | *"Source and destination accounts must be different."* |
+
+✅ The group refusal is worth stopping on: `Money Budget` **wants** a group so it can roll the
+subtree up, and a plan refuses one — because a heading holds no ledger account and an
+occurrence posted to it would fail every month at 3am. Same tree, opposite answer, both right.
+
+✅ The **Category** link offers only `Desk Test`'s categories, only the right side of the books
+(switch the type to Income and the list changes to `DT Salary`), and never `DT Food`. The
+**Account** links offer only `Desk Test`'s three accounts.
+
+### Deleting a plan
+
+Delete `DT Salary Plan`.
+
+✅ It deletes — and the 50,000 it posted **is still there**, still submitted, with its
+`Recurring Transaction` field now empty. The money really moved; only the arrangement was
+deleted. (`Archived` is the better answer for a plan you have finished with, which is why the
+status exists.)
+
+### The dashboard, a fourth time
+
+Back to **Money Tracker**, with every widget's Tracker filter on `Desk Test`:
+
+✅ **Fixed Costs** reads **₹ 9,200.00** — `DT Rent Plan` 8,000 plus `DT Power Bill` 1,200 a
+month. The Income plan is not a cost by any reading, and the Transfer is a commitment but not
+a cost: the money is still yours. (If you deleted `DT Salary Plan` above, this figure does not
+move, which is the point.)
+
+✅ **Plans Running** reads **2 of 3** — the paused `DT Sweep` is not running. (Three, because
+`DT Salary Plan` was deleted.)
+
+✅ **Upcoming Recurring** draws six months, Income and Expense side by side. The **current
+month reads zero on both** — today's occurrences have already been dealt with, and the window
+opens *strictly after today* so that one rent cannot appear in the forecast and in the
+Income vs Expense actuals at once. Next month: Expense **9,200**, Income **0** (the salary plan
+is gone).
+
+✅ Click the funnel: **Tracker**, **Status** and **Months Ahead** (default 6). Set Months Ahead
+to 2 → two bars. Set Status to `Paused` → only `DT Sweep`, which is a Transfer, so **both
+series read zero** for every month. That is not a bug: a transfer belongs in neither series.
+
+✅ Unfiltered, against the demo household: **Fixed Costs ₹ 39,699.00** (rent 35,000 +
+electricity 3,200 + streaming 1,499), **Plans Running 5 of 5**, and the forecast draws
+Income **1,20,000** and Expense **39,699** for every month after this one.
+
+---
+
+## 16. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
-2. Delete the six `DT *` goals from §13 — a goal is not submittable, so it just deletes.
+2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14 and the `DT *`
+   plans from §15 — none is submittable, so they just delete. Deleting a plan leaves the
+   transactions it posted behind, with the link cleared; cancel and delete those with the rest.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
 4. Delete `DT Bank`, `DT SBI`, `DT Card`.
 5. Delete tracker `Desk Test`, and user `dt.other@example.com`.
 
-Goals before accounts and categories: a goal links to both.
+Goals, budgets and plans before accounts and categories: all three link to both.
 
 Two things deliberately survive and are safe to leave:
 
@@ -577,3 +890,13 @@ Two things deliberately survive and are safe to leave:
   case: open any of them from §7 and the pace marker sits mid-bar.
 - `Money Goal`'s `Archived` status, and a Savings goal on the `Contributions Since Start`
   basis — §13's pot uses `Account Balance`. Both are covered by the automated suite.
+- A budget on a **Weekly or Quarterly** period, and a rollover carrying a **deficit** — §14
+  is monthly throughout and the one rollover it looks at is in surplus. Both are covered by
+  the automated suite.
+- A **Weekly, Fortnightly, Quarterly or Yearly** plan, and a plan that catches up on more than
+  one missed occurrence — §15 is monthly throughout and every plan there is one day old. Both
+  are covered by the automated suite, along with the `MAX_PER_RUN` bound and the savepoint that
+  keeps one broken plan from stopping the nightly job.
+- A budget measured **while its period is still running**. §14 clamps every envelope to a
+  closed August on purpose, so its figures read the same whenever you run it; the demo
+  household's five budgets are the live case, and their pace markers sit mid-bar.

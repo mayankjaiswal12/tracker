@@ -1,0 +1,313 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "RTX-.#####",
+ "creation": "2026-08-20 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "schedule_status_section",
+  "progress_html",
+  "basics_section",
+  "recurring_name",
+  "transaction_type",
+  "tracker",
+  "status",
+  "column_break_basics",
+  "category",
+  "color",
+  "icon",
+  "money_section",
+  "amount",
+  "currency",
+  "column_break_money",
+  "account",
+  "destination_account",
+  "payment_method",
+  "schedule_section",
+  "frequency",
+  "start_date",
+  "end_date",
+  "column_break_schedule",
+  "create_mode",
+  "notify_on_post",
+  "details_section",
+  "merchant",
+  "payee",
+  "tags",
+  "column_break_details",
+  "is_reimbursable",
+  "is_tax_deductible",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "schedule_status_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "progress_html",
+   "fieldtype": "HTML",
+   "label": "Schedule"
+  },
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "recurring_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name",
+   "reqd": 1
+  },
+  {
+   "default": "Expense",
+   "description": "What each occurrence posts. A Refund is deliberately not offered: a refund answers one particular expense, and a schedule cannot know which.",
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Transaction Type",
+   "options": "Expense\nIncome\nTransfer\nCredit Card Payment",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "Active",
+   "description": "Whether the plan is running. Whether it is up to date is worked out from the ledger, so it is not a choice here.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nPaused\nArchived",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:![\"Transfer\", \"Credit Card Payment\"].includes(doc.transaction_type)",
+   "description": "What each occurrence is filed under. A movement between your own accounts has none.",
+   "fieldname": "category",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "Category"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "money_section",
+   "fieldtype": "Section Break",
+   "label": "Money"
+  },
+  {
+   "description": "What one occurrence is worth. A bill that varies is better set to Create as Draft below.",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_money",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The account the money leaves from, or arrives in for an Income.",
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "options": "Money Account",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:[\"Transfer\", \"Credit Card Payment\"].includes(doc.transaction_type)",
+   "description": "The other side of a Transfer or a Credit Card Payment.",
+   "fieldname": "destination_account",
+   "fieldtype": "Link",
+   "label": "Destination Account",
+   "options": "Money Account"
+  },
+  {
+   "fieldname": "payment_method",
+   "fieldtype": "Link",
+   "label": "Payment Method",
+   "options": "Money Payment Method"
+  },
+  {
+   "fieldname": "schedule_section",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
+  },
+  {
+   "default": "Monthly",
+   "description": "How often it happens. Every occurrence is counted from the Start Date, so a plan starting on the 31st keeps the 31st in the months that have one.",
+   "fieldname": "frequency",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Frequency",
+   "options": "Daily\nWeekly\nFortnightly\nMonthly\nQuarterly\nYearly",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Today",
+   "description": "The first occurrence, and the day of the month or week every later one falls on. Nothing is posted for a date before the plan itself was created.",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "description": "The last day an occurrence may fall on. Leave it empty and the plan runs indefinitely.",
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date"
+  },
+  {
+   "fieldname": "column_break_schedule",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Post Automatically",
+   "description": "Post Automatically submits each occurrence to the ledger. Create as Draft leaves it for you to check first, which is what a bill that varies wants.",
+   "fieldname": "create_mode",
+   "fieldtype": "Select",
+   "label": "When It Runs",
+   "options": "Post Automatically\nCreate as Draft",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Send a notification each time this plan posts something.",
+   "fieldname": "notify_on_post",
+   "fieldtype": "Check",
+   "label": "Notify Me"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "description": "Copied onto every occurrence.",
+   "fieldname": "merchant",
+   "fieldtype": "Data",
+   "label": "Merchant"
+  },
+  {
+   "fieldname": "payee",
+   "fieldtype": "Data",
+   "label": "Payee"
+  },
+  {
+   "description": "Labels that cut across categories. A transaction has one category but may carry several tags, so tag totals overlap and do not add up to total spending.",
+   "fieldname": "tags",
+   "fieldtype": "Table MultiSelect",
+   "label": "Tags",
+   "options": "Money Transaction Tag"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_reimbursable",
+   "fieldtype": "Check",
+   "label": "Reimbursable"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_tax_deductible",
+   "fieldtype": "Check",
+   "label": "Tax Deductible"
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-22 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Recurring Transaction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "recurring_name"
+}

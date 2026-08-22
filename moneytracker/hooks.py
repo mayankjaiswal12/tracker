@@ -128,6 +128,9 @@ permission_query_conditions = {
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Budget": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 }
 
 has_permission = {
@@ -136,6 +139,9 @@ has_permission = {
 	"Money Account": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Category": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Goal": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Budget": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 }
 
 # DocType Class
@@ -161,23 +167,20 @@ has_permission = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"moneytracker.tasks.all"
-# 	],
-# 	"daily": [
-# 		"moneytracker.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"moneytracker.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"moneytracker.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"moneytracker.tasks.monthly"
-# 	],
-# }
+# Once a day is the right cadence for both of these, and both are idempotent, so the order
+# Frappe happens to run them in does not matter:
+#
+# * `run_recurring_transactions` holds no state at all — a second run posts nothing, because
+#   the transactions the first run made are already linked to their plans.
+# * `send_budget_alerts` stamps each budget with the period and outcome it last announced, so
+#   a second run on the same figures sends nothing. If it happens to run *before* this
+#   morning's rent posts, it simply says so again tomorrow with the fuller figure.
+scheduler_events = {
+	"daily": [
+		"moneytracker.money_tracker.services.recurring.run_recurring_transactions",
+		"moneytracker.money_tracker.services.budgets.send_budget_alerts",
+	],
+}
 
 # Testing
 # -------
@@ -259,4 +262,3 @@ before_tests = "moneytracker.money_tracker.setup.before_tests"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
