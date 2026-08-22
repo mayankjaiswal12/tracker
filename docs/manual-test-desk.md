@@ -40,11 +40,22 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 ### Existing data
 
 Tracker **Demo Household** and its four accounts are the demo data
-(`money_tracker/demo.py`), seeded 2026-08-16: 67 transactions over 2026-04-01 … 2026-08-15,
-seven goals added 2026-08-17, **five budgets added 2026-08-19** and **five standing orders
-added 2026-08-20**, which is what the workspace cards and charts show. Ignore it for the posting steps — this
-run creates its own `DT *` set so the numbers stay clean — and use it in §7, where the point
-is that the widgets read a populated tracker.
+(`money_tracker/demo.py`), **reseeded 2026-08-22**: 72 transactions over five months, seven
+goals, five budgets, five standing orders, twelve merchants, three tags, three bills and two
+receipts — plus one split grocery run, one transfer carrying a fee, and the first month already
+reconciled. That is what the workspace cards and charts show.
+
+**Ignore it for §1–§15** — those create their own `DT *` set so the numbers stay clean — except
+§7, where the point is that the widgets read a populated tracker. **§17–§22 run entirely on the
+demo household and need nothing created.**
+
+If the figures below do not match, reseed:
+
+```bash
+docker exec -w /workspace/development/frappe-bench frappe_bench2-frappe-1 bash -lc \
+  'bench --site tracker.localhost execute moneytracker.money_tracker.demo.clear_demo_data && \
+   bench --site tracker.localhost execute moneytracker.money_tracker.demo.setup_demo_data'
+```
 
 The old `Verify Ledger` / `VL *` data this document used to mention was deleted on
 2026-08-16, along with the user `vl.other@example.com`; the demo replaced it.

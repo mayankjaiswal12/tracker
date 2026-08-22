@@ -242,6 +242,8 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-22 | **Docs brought up to date** — architecture.md, roadmap.rst (§0 verdicts + A1 marked built), task.md, CLAUDE.md, manual-test-desk.md. |
+| 2026-08-22 | **Desk gaps closed.** 11 cards, 21 shortcuts, Mark Paid + Reconcile dialogs, filtered pickers, demo seeds all of A1, manual-test-desk §17–§22. Fixed an orphaned-child-row bug in `clear_demo_data`. 716 tests. |
 | 2026-08-22 | **A1 complete.** Receipts, reconciliation and bills shipped; 715 tests. |
 | 2026-08-22 | A1.5 transfer fees shipped; 639 tests. Restated the balance-sheet-only invariant in architecture.md. |
 | 2026-08-22 | A1.4 splits shipped; 617 tests. Category roll-ups and budgets made split-aware; fixed a whole-tracker budget double-count. |

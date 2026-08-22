@@ -217,18 +217,51 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions. All of it is
-covered by **523 tests** (`bench --site tracker.localhost run-tests --app moneytracker`).
+Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; and Phase 3 (A1 in
+`docs/roadmap.rst`) has added tags, merchants, splits, transfer fees, reconciliation, receipts
+and bills. All of it is covered by **716 tests**
+(`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
+| **16** | DocTypes, of which **2** are child tables — the first the app had |
 | **5** | posting strategies implemented, of fourteen declared types |
-| **9** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs |
+| **11** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills |
 | **5** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual, upcoming recurring |
 | **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
 | **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
 | **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES` |
+| **3** | daily scheduler jobs — recurring postings, budget alerts, bill reminders |
+| **11** | tracker-scoped DocTypes, each registered in *both* hook dicts |
 | **38** | categories seeded for a new tracker, as a two-level tree |
+
+### What A1 changed, and the rule it kept finding
+
+Seven modules landed in one phase, and three of them attach money to a category in a way the
+category tree cannot see on its own. A **split** transaction has several categories, so it
+carries none of its own. A **transfer fee** is charged on a voucher that has no category by
+construction. Both post correctly to the ledger and both were invisible to
+`get_category_totals` and `get_net_spend_by_date` until those were taught to read them.
+
+That is the same edit twice, and it is worth stating as a rule rather than as two anecdotes:
+
+> **Any new way of attaching money to a category needs both aggregation call sites updated**,
+> or the money reaches `GL Entry`, the bank balance stays right, and the spending disappears
+> from the roll-up, the chart and every budget. Nothing looks broken.
+
+Two other boundaries were drawn the way the goal/budget one was — name what each owns, then
+keep the other's fields off it:
+
+- **A bill is a claim; a plan is a schedule.** The giveaway is *overdue*, a state a plan cannot
+  have: if a plan has not posted the scheduler is broken, whereas an unpaid bill is a fact
+  about a person. They compose — a bill may name the plan that settles it.
+- **A tag is not a second category tree.** A category partitions spending and a transaction has
+  exactly one; a tag overlaps and a transaction may carry several. So tag totals deliberately
+  do not add up, and `tagged` and `total` are measured by a query that joins nothing.
+
+And one invariant had to be restated rather than defended — see *Transfer* above: the movement
+is balance-sheet only, but a fee is expense, because the bank kept it.
+
 
 Goals, budgets and plans share one habit with `Money Account.current_balance`: **they store
 nothing they could derive**. A stored counter drifts the first time a transaction is
