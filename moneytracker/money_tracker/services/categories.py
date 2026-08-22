@@ -94,6 +94,44 @@ def seed_default_categories(tracker):
 	return frappe.db.count("Category", {"tracker": tracker}) - before
 
 
+def _split_rows(tracker, types, from_date=None, to_date=None, categories=None):
+	"""Every split row in the window as `(category, transaction_type, date, base_amount)`.
+
+	A split transaction has **no** `category` of its own — the controller clears it — so it is
+	invisible to the plain grouped queries below, and its money would simply disappear from
+	every category total and every budget. This is where it comes back.
+
+	Child fields are selected, never aggregated: `get_all` will put a backticked child column
+	in the SELECT and join correctly, but wrapping one in `SUM()` makes its join parser read
+	the aggregate as another table and emit invalid SQL. They are aliased because both tables
+	carry `base_amount`. Summing happens in Python, over the split rows only, which are few.
+	"""
+	filters = [
+		["Transaction", "tracker", "=", tracker],
+		["Transaction", "docstatus", "=", 1],
+		["Transaction", "transaction_type", "in", list(types)],
+		["Money Transaction Split", "category", "is", "set"],
+	]
+	if from_date and to_date:
+		filters.append(["Transaction", "date", "between", [from_date, to_date]])
+	if categories is not None:
+		if not categories:
+			return []
+		filters.append(["Money Transaction Split", "category", "in", list(categories)])
+
+	return frappe.get_all(
+		"Transaction",
+		filters=filters,
+		fields=[
+			"name as transaction",
+			"transaction_type",
+			"date",
+			"`tabMoney Transaction Split`.category as split_category",
+			"`tabMoney Transaction Split`.base_amount as split_base_amount",
+		],
+	)
+
+
 def get_category_totals(tracker, category_type="Expense", from_date=None, to_date=None):
 	"""Every category on the tracker with its own total and its total including descendants.
 
@@ -128,6 +166,15 @@ def get_category_totals(tracker, category_type="Expense", from_date=None, to_dat
 	own = {}
 	for row in rows:
 		own[row.category] = flt(own.get(row.category, 0.0)) + net_sign(row.transaction_type) * flt(row.total)
+
+	# A split bill contributes to each category it was split across. Its parent carries no
+	# category at all, so without this the money is missing from the roll-up entirely.
+	names = [c.name for c in categories]
+	types = SPEND_TYPES if category_type == "Expense" else ("Income",)
+	for row in _split_rows(tracker, types, from_date, to_date, categories=names):
+		own[row.split_category] = flt(own.get(row.split_category, 0.0)) + net_sign(
+			row.transaction_type
+		) * flt(row.split_base_amount)
 
 	result = []
 	for category in categories:
@@ -168,11 +215,21 @@ def get_net_spend_by_date(tracker, category=None, from_date=None, to_date=None):
 	if from_date and to_date:
 		filters["date"] = ["between", [from_date, to_date]]
 
+	subtree = None
 	if category:
 		subtree = get_subtree(category)
 		if not subtree:
 			return {}
 		filters["category"] = ["in", subtree]
+
+	# Fetched before the main query so the transactions they belong to can be left out of it.
+	# `get_category_totals` needs no such guard: it filters on `category in (...)`, and a split
+	# transaction's own category is empty, so it is excluded already. Here there may be no
+	# category filter at all — a whole-tracker budget — and without this the parent's full
+	# amount would be counted *and* its shares added on top of it.
+	splits = _split_rows(tracker, SPEND_TYPES, from_date, to_date, categories=subtree if category else None)
+	if splits:
+		filters["name"] = ["not in", list({row.transaction for row in splits})]
 
 	rows = frappe.get_all(
 		"Transaction",
@@ -185,6 +242,15 @@ def get_net_spend_by_date(tracker, category=None, from_date=None, to_date=None):
 	for row in rows:
 		day = getdate(row.date)
 		by_date[day] = flt(by_date.get(day, 0.0)) + net_sign(row.transaction_type) * flt(row.total)
+
+	# Budgets measure through here, so a split grocery bill has to reach the Groceries envelope
+	# as surely as an unsplit one does. `subtree` is already resolved above when a category was
+	# given; `None` means the whole tracker and therefore every split row in it.
+	for row in splits:
+		day = getdate(row.date)
+		by_date[day] = flt(by_date.get(day, 0.0)) + net_sign(row.transaction_type) * flt(
+			row.split_base_amount
+		)
 	return by_date
 
 
