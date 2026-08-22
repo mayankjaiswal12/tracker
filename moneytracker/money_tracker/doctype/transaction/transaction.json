@@ -25,6 +25,8 @@
   "column_break_accounts",
   "category",
   "payment_method",
+  "splits_section",
+  "splits",
   "details_section",
   "merchant",
   "payee",
@@ -172,15 +174,30 @@
    "options": "Money Payment Method"
   },
   {
+   "depends_on": "eval:!['Transfer','Credit Card Payment'].includes(doc.transaction_type)",
+   "fieldname": "splits_section",
+   "fieldtype": "Section Break",
+   "label": "Split Across Categories"
+  },
+  {
+   "description": "Split one payment across several categories. They must add up to the amount. Leave empty and the single Category above is used.",
+   "fieldname": "splits",
+   "fieldtype": "Table",
+   "label": "Splits",
+   "options": "Money Transaction Split"
+  },
+  {
    "collapsible": 1,
    "fieldname": "details_section",
    "fieldtype": "Section Break",
    "label": "More"
   },
   {
+   "description": "Who the money went to, or came from. A record rather than free text, so spending can be grouped by it.",
    "fieldname": "merchant",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Merchant",
+   "options": "Money Merchant",
    "search_index": 1
   },
   {
@@ -265,7 +282,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-22 10:05:00.000000",
+ "modified": "2026-08-22 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Transaction",

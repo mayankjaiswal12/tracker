@@ -28,6 +28,7 @@ from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day
 from moneytracker.money_tracker.services import balances
 from moneytracker.money_tracker.services import budgets as budgets_service
 from moneytracker.money_tracker.services import goals as goals_service
+from moneytracker.money_tracker.services import merchants as merchants_service
 from moneytracker.money_tracker.services import recurring as recurring_service
 from moneytracker.money_tracker.services import settings as settings_service
 
@@ -676,7 +677,7 @@ def _create_recurring(tracker, accounts, methods, period, posted_by_day):
 				"destination_account": accounts.get(plan_row.get("destination_account")),
 				"category": _category(tracker, plan_row) if plan_row.get("category") else None,
 				"payment_method": methods.get(plan_row.get("payment_method")),
-				"merchant": plan_row.get("merchant"),
+				"merchant": merchants_service.resolve(plan_row.get("merchant"), tracker, create=True),
 				"payee": plan_row.get("payee"),
 				"create_mode": row.get("create_mode", recurring_service.POST_AUTOMATICALLY),
 				"color": row.get("color"),
@@ -760,7 +761,7 @@ def _post(tracker, accounts, methods, month_start, row):
 			"destination_account": accounts.get(row.get("destination_account")),
 			"category": _category(tracker, row) if row.get("category") else None,
 			"payment_method": methods.get(row.get("payment_method")),
-			"merchant": row.get("merchant"),
+			"merchant": merchants_service.resolve(row.get("merchant"), tracker, create=True),
 			"payee": row.get("payee"),
 			"notes": row.get("notes"),
 		}
@@ -923,6 +924,7 @@ def clear_demo_data(tracker=None, tracker_name=None):
 	removed["goals"] = _delete_all("Money Goal", {"tracker": tracker})
 	removed["budgets"] = _delete_all("Money Budget", {"tracker": tracker})
 	removed["recurring"] = _delete_all("Money Recurring Transaction", {"tracker": tracker})
+	removed["merchants"] = _delete_all("Money Merchant", {"tracker": tracker})
 	removed["money_accounts"] = _delete_all("Money Account", {"tracker": tracker})
 	removed["categories"] = _delete_categories(tracker)
 	frappe.delete_doc("Tracker", tracker, ignore_permissions=True, force=True)

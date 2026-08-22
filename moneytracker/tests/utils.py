@@ -153,6 +153,25 @@ def make_budget(tracker=None, **kwargs):
 	return doc
 
 
+def make_payment_method(**kwargs):
+	"""A payment method. Site-wide rather than per-tracker, unlike everything around it —
+	the ways of paying are a small closed set, not a household's own list."""
+	kwargs.setdefault("method_name", unique("Method"))
+
+	doc = frappe.get_doc({"doctype": "Money Payment Method", **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_merchant(tracker=None, **kwargs):
+	"""A merchant on `tracker`. Names are minted unique because they are unique per tracker."""
+	kwargs.setdefault("merchant_name", unique("Merchant"))
+
+	doc = frappe.get_doc({"doctype": "Money Merchant", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_tag(tracker=None, **kwargs):
 	"""A tag on `tracker`. Names are minted unique because they are unique per tracker."""
 	kwargs.setdefault("tag_name", unique("Tag"))

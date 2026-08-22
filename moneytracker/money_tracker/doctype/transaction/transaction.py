@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import flt, fmt_money
 
 from moneytracker.money_tracker.posting import engine
 from moneytracker.money_tracker.services import fx
@@ -22,13 +22,50 @@ class Transaction(Document):
 			self.company = settings_service.get_company()
 		if not self.currency:
 			self.currency = frappe.db.get_value("Money Account", self.account, "currency")
+		self.apply_merchant_defaults()
 
 	def validate(self):
 		self.validate_amount()
 		self.validate_accounts()
 		self.validate_category()
 		self.validate_tags()
+		self.validate_merchant()
 		self.set_base_amount()
+		# After `set_base_amount`, which is where `exchange_rate` is resolved — each split row
+		# is stamped with its own base amount at that rate.
+		self.validate_splits()
+
+	def apply_merchant_defaults(self):
+		"""Let the merchant fill in what has been left blank, and nothing else.
+
+		A default is a convenience on entry, not a rule: it only ever fills an empty field, so
+		editing a merchant never rewrites what is already saved, and a category typed by hand
+		always wins. Runs in `before_validate` so `validate_category` still gets the last word
+		on whatever ends up there.
+		"""
+		if not self.merchant or self.transaction_type in ACCOUNT_TO_ACCOUNT_TYPES:
+			return
+
+		defaults = frappe.db.get_value(
+			"Money Merchant", self.merchant, ["default_category", "default_payment_method"], as_dict=True
+		)
+		if not defaults:
+			return
+		if not self.category:
+			self.category = defaults.default_category
+		if not self.payment_method:
+			self.payment_method = defaults.default_payment_method
+
+	def validate_merchant(self):
+		"""A merchant from another tracker would quietly mix two households' spending."""
+		if not self.merchant:
+			return
+
+		merchant_tracker, merchant_name = frappe.db.get_value(
+			"Money Merchant", self.merchant, ["tracker", "merchant_name"]
+		)
+		if merchant_tracker and merchant_tracker != self.tracker:
+			frappe.throw(_("Merchant {0} belongs to another tracker.").format(frappe.bold(merchant_name)))
 
 	def validate_amount(self):
 		if flt(self.amount) <= 0:
@@ -61,6 +98,71 @@ class Transaction(Document):
 			frappe.throw(
 				_("{0} is a group category. Post to one of its sub-categories instead.").format(category_name)
 			)
+
+	def validate_splits(self):
+		"""Splits must add up to the amount, and each must be somewhere money can be posted.
+
+		**When a transaction is split it has no single category, so `category` is cleared.**
+		Keeping a "primary" one alongside the rows would be counted twice by everything that
+		sums categories — the roll-up, the chart, every budget. `services/categories.py` reads
+		the split rows instead, which is why splitting a bill does not make its money vanish
+		from a budget.
+
+		`base_amount` is stamped on each row here, at the transaction's own exchange rate, for
+		the same reason `Transaction.base_amount` is stored: the rate is a fact about the day
+		it happened, and recomputing later would restate last year's totals. This runs *after*
+		`set_base_amount` for that reason — that is where the rate is resolved.
+		"""
+		if not self.splits:
+			return
+
+		if self.transaction_type in ACCOUNT_TO_ACCOUNT_TYPES:
+			frappe.throw(
+				_(
+					"A {0} moves money between accounts, so there is nothing to split across categories."
+				).format(self.transaction_type)
+			)
+
+		total = sum(flt(row.amount) for row in self.splits)
+		if flt(total, self.precision("amount")) != flt(self.amount, self.precision("amount")):
+			frappe.throw(
+				_("The splits add up to {0}, but the transaction is {1}.").format(
+					frappe.bold(fmt_money(total, currency=self.currency)),
+					frappe.bold(fmt_money(flt(self.amount), currency=self.currency)),
+				)
+			)
+
+		expected = "Income" if self.transaction_type == "Income" else "Expense"
+		rate = flt(self.exchange_rate) or 1.0
+
+		for row in self.splits:
+			if flt(row.amount) <= 0:
+				frappe.throw(_("Every split must be greater than zero."))
+
+			category = frappe.db.get_value(
+				"Category",
+				row.category,
+				["tracker", "category_type", "is_group", "category_name"],
+				as_dict=True,
+			)
+			if category.tracker and category.tracker != self.tracker:
+				frappe.throw(_("Category {0} belongs to another tracker.").format(category.category_name))
+			if category.is_group:
+				frappe.throw(
+					_("{0} is a group category. Split to one of its sub-categories instead.").format(
+						category.category_name
+					)
+				)
+			if category.category_type != expected:
+				frappe.throw(
+					_("{0} is an {1} category, but this is a {2}.").format(
+						category.category_name, category.category_type, self.transaction_type
+					)
+				)
+			row.base_amount = flt(row.amount) * rate
+
+		# Last, so the checks above still had the single category available to compare against.
+		self.category = None
 
 	def validate_tags(self):
 		"""Tags must belong to this tracker, and each may appear once.

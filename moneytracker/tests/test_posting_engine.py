@@ -18,6 +18,7 @@ from moneytracker.tests.utils import (
 	ledger_movement,
 	make_account,
 	make_category,
+	make_merchant,
 	make_tracker,
 	make_transaction,
 	money_setting,
@@ -148,7 +149,9 @@ class TestPostingPerType(LedgerFixture):
 		self.assertEqual(frappe.db.count("Journal Entry Account", {"reference_name": transaction.name}), 2)
 
 	def test_the_remark_names_the_transaction(self):
-		transaction = self.expense(amount=99, merchant="Cafe", notes="lunch")
+		"""`merchant` is a Link, so the remark has to print the name and not `MER-00007`."""
+		cafe = make_merchant(self.tracker, merchant_name="Cafe")
+		transaction = self.expense(amount=99, merchant=cafe.name, notes="lunch")
 		self.assertEqual(je_of(transaction).user_remark, "Expense | Cafe | lunch")
 
 

@@ -37,7 +37,9 @@ def fake_category(name="Food", category_type="Expense", ledger_account=None):
 	)
 
 
-def build_context(amount=1000, account=None, category=None, destination=None, transaction_type="Expense"):
+def build_context(
+	amount=1000, account=None, category=None, destination=None, transaction_type="Expense", splits=None
+):
 	"""A PostingContext with its lookups pre-resolved instead of read from the database.
 
 	`__new__` rather than `__init__` so `require_category` / `require_destination` — the
@@ -50,6 +52,8 @@ def build_context(amount=1000, account=None, category=None, destination=None, tr
 	ctx.account = account or fake_account()
 	ctx.destination_account = destination
 	ctx.category = category
+	# A split transaction carries no single category; these hold the breakdown instead.
+	ctx.splits = [frappe._dict(category=category, amount=amount) for category, amount in (splits or [])]
 	return ctx
 
 
@@ -276,3 +280,75 @@ class TestCreditCardPaymentStrategy(unittest.TestCase):
 		with self.assertRaises(frappe.ValidationError) as caught:
 			strategies.STRATEGIES["Credit Card Payment"](ctx)
 		self.assertIn("another liability", str(caught.exception))
+
+
+class TestSplitLegs(unittest.TestCase):
+	"""One payment, several categories — and the engine none the wiser.
+
+	The point of these is that `posting/engine.py` is not mentioned anywhere in them. Adding
+	split posting was a strategy edit, which is the bargain the engine/strategy split was made
+	for in the first place.
+	"""
+
+	def test_an_expense_debits_each_category_and_credits_the_account_once(self):
+		legs = strategies.get_strategy("Expense")(
+			build_context(
+				amount=1000,
+				splits=[(fake_category("Groceries"), 800), (fake_category("Household"), 200)],
+			)
+		)
+		self.assertEqual(len(legs), 3)
+		self.assertEqual(
+			[(leg.ledger_account, leg.debit) for leg in legs if leg.debit],
+			[("Groceries - T", 800), ("Household - T", 200)],
+		)
+		credits = [leg for leg in legs if leg.credit]
+		self.assertEqual(len(credits), 1, "one payment left the account, so one credit")
+		self.assertEqual(credits[0].credit, 1000)
+
+	def test_an_income_credits_each_category_and_debits_the_account_once(self):
+		legs = strategies.get_strategy("Income")(
+			build_context(
+				amount=5000,
+				transaction_type="Income",
+				splits=[
+					(fake_category("Salary", "Income"), 4000),
+					(fake_category("Bonus", "Income"), 1000),
+				],
+			)
+		)
+		self.assertEqual(len(legs), 3)
+		self.assertEqual(len([leg for leg in legs if leg.debit]), 1)
+		self.assertEqual(
+			[(leg.ledger_account, leg.credit) for leg in legs if leg.credit],
+			[("Salary - T", 4000), ("Bonus - T", 1000)],
+		)
+
+	def test_split_legs_balance(self):
+		legs = strategies.get_strategy("Expense")(
+			build_context(
+				amount=999,
+				splits=[
+					(fake_category("A"), 333),
+					(fake_category("B"), 333),
+					(fake_category("C"), 333),
+				],
+			)
+		)
+		engine.validate_balanced(legs)
+
+	def test_a_split_onto_the_wrong_side_of_the_books_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			strategies.get_strategy("Expense")(
+				build_context(amount=100, splits=[(fake_category("Salary", "Income"), 100)])
+			)
+
+	def test_a_split_category_with_no_ledger_account_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			strategies.get_strategy("Expense")(
+				build_context(amount=100, splits=[(fake_category("Food", ledger_account=""), 100)])
+			)
+
+	def test_no_splits_still_takes_the_single_category_path(self):
+		legs = strategies.get_strategy("Expense")(build_context(amount=100, category=fake_category("Food")))
+		self.assertEqual(len(legs), 2)

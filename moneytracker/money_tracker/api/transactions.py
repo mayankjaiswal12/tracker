@@ -11,6 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import today
 
+from moneytracker.money_tracker.services import merchants as merchants_service
 from moneytracker.money_tracker.services import tags as tags_service
 
 
@@ -151,7 +152,13 @@ def search_transactions(
 	or_filters = {}
 	if query:
 		like = f"%{query}%"
-		or_filters = {"merchant": ["like", like], "payee": ["like", like], "notes": ["like", like]}
+		or_filters = {"payee": ["like", like], "notes": ["like", like]}
+		# `merchant` is a Link now, so the column holds MER-00007 and a LIKE against it would
+		# match the ID rather than the name — silently returning nothing for every merchant
+		# search. The names are resolved to IDs first and matched exactly.
+		matches = merchants_service.search_names(query, tracker) if tracker else []
+		if matches:
+			or_filters["merchant"] = ["in", matches]
 
 	return frappe.get_all(
 		"Transaction",
