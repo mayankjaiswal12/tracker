@@ -163,6 +163,28 @@ def make_payment_method(**kwargs):
 	return doc
 
 
+def make_bill(tracker=None, **kwargs):
+	"""A bill on `tracker`. Unpaid, due today, 1,000 unless told otherwise."""
+	kwargs.setdefault("bill_name", unique("Bill"))
+	kwargs.setdefault("amount", 1000)
+	kwargs.setdefault("due_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Bill", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_receipt(tracker=None, **kwargs):
+	"""A receipt on `tracker`. Carries an image unless told otherwise, since a receipt with
+	neither a file nor an image is refused."""
+	kwargs.setdefault("image", f"/files/{unique('receipt')}.png")
+	kwargs.setdefault("title", unique("Receipt"))
+
+	doc = frappe.get_doc({"doctype": "Money Receipt", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_merchant(tracker=None, **kwargs):
 	"""A merchant on `tracker`. Names are minted unique because they are unique per tracker."""
 	kwargs.setdefault("merchant_name", unique("Merchant"))

@@ -132,6 +132,8 @@ permission_query_conditions = {
 	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Merchant": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Receipt": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Bill": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 }
 
 has_permission = {
@@ -144,6 +146,8 @@ has_permission = {
 	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Merchant": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Receipt": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Bill": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 }
 
 # DocType Class
@@ -181,6 +185,7 @@ scheduler_events = {
 	"daily": [
 		"moneytracker.money_tracker.services.recurring.run_recurring_transactions",
 		"moneytracker.money_tracker.services.budgets.send_budget_alerts",
+		"moneytracker.money_tracker.services.bills.send_bill_reminders",
 	],
 }
 

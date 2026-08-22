@@ -40,10 +40,16 @@
   "is_reimbursable",
   "is_tax_deductible",
   "notes",
+  "reconciliation_section",
+  "reference_no",
+  "is_reconciled",
+  "column_break_reconciliation",
+  "cleared_date",
   "ledger_section",
   "journal_entry",
   "reversal_of",
   "recurring_transaction",
+  "bill",
   "amended_from"
  ],
  "fields": [
@@ -276,6 +282,42 @@
   },
   {
    "collapsible": 1,
+   "fieldname": "reconciliation_section",
+   "fieldtype": "Section Break",
+   "label": "Reconciliation"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Cheque number, UTR, or whatever the statement calls this line.",
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "label": "Reference No",
+   "search_index": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "description": "Ticked off against a statement. Says nothing about the money — only that somebody has seen it on a statement.",
+   "fieldname": "is_reconciled",
+   "fieldtype": "Check",
+   "label": "Reconciled",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_reconciliation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "is_reconciled",
+   "description": "The date the statement shows it clearing, which need not be the transaction's own date.",
+   "fieldname": "cleared_date",
+   "fieldtype": "Date",
+   "label": "Cleared Date",
+   "no_copy": 1
+  },
+  {
+   "collapsible": 1,
    "fieldname": "ledger_section",
    "fieldtype": "Section Break",
    "label": "Ledger"
@@ -309,6 +351,15 @@
    "search_index": 1
   },
   {
+   "description": "The bill this payment settled, if it came from one.",
+   "fieldname": "bill",
+   "fieldtype": "Link",
+   "label": "Bill",
+   "no_copy": 1,
+   "options": "Money Bill",
+   "read_only": 1
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -322,7 +373,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-22 18:00:00.000000",
+ "modified": "2026-08-22 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Transaction",

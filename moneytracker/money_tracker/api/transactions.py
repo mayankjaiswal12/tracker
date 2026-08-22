@@ -152,7 +152,7 @@ def search_transactions(
 	or_filters = {}
 	if query:
 		like = f"%{query}%"
-		or_filters = {"payee": ["like", like], "notes": ["like", like]}
+		or_filters = {"payee": ["like", like], "notes": ["like", like], "reference_no": ["like", like]}
 		# `merchant` is a Link now, so the column holds MER-00007 and a LIKE against it would
 		# match the ID rather than the name — silently returning nothing for every merchant
 		# search. The names are resolved to IDs first and matched exactly.

@@ -12,15 +12,15 @@ green *and* it has been looked at in Desk.
 
 | | |
 |---|---|
-| Branch | `feat/phase-3-transfer-fees` |
-| Tests | **639 green**, ~77s |
+| Branch | `feat/phase-3-a1-rest` |
+| Tests | **715 green**, ~89s |
 | Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`) |
-| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits · A1.5 transfer fees** |
+| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits · A1.5 transfer fees · **A1 complete** |
 | **Blocking** | **The manual Desk pass — owed since Phase 1, deferred four times** |
 
 ### The one thing owed
 
-The manual Desk pass (`docs/manual-test-desk.md`). 639 automated tests say the arithmetic is
+The manual Desk pass (`docs/manual-test-desk.md`). 715 automated tests say the arithmetic is
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
@@ -32,6 +32,9 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 | Module | Date | Branch | Tests |
 |---|---|---|---|
+| `Money Bill` — money owed, tracked until settled | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
+| `Money Receipt` — the paper behind a transaction | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
+| Reconciliation — ticking off against a statement | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
 | Transfer & card-payment fees | 2026-08-22 | `feat/phase-3-transfer-fees` | ✅ tests, Desk unseen |
 | `Money Transaction Split` — one payment, several categories | 2026-08-22 | `feat/phase-3-splits` | ✅ tests, Desk unseen |
 | `Money Merchant` — who the money went to | 2026-08-22 | `feat/phase-3-merchants` | ✅ tests, Desk unseen |
@@ -53,18 +56,18 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 
-### A1 — core missing functionality *(gated on the Desk pass)*
+### A1 — core missing functionality — **all seven built, none seen in Desk**
 
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
 | — | **Manual Desk pass** | 🟡 | `feat/phase-2-recurring` | Gate for everything below |
 | A1.1 | Tags | 🟡 | `feat/phase-3-tags` | Code + 33 tests green; **Desk unseen**. Tag totals overlap by design; `total`/`tagged` measured without the join |
-| A1.2 | Receipts and attachments | ⬜ | | OCR-ready columns filled by nothing until B5 |
+| A1.2 | Receipts and attachments | 🟡 | `feat/phase-3-a1-rest` | 15 tests. Standalone doctype, not a child table — paper is captured before it is entered |
 | A1.3 | Merchant master | 🟡 | `feat/phase-3-merchants` | Code + 36 tests green; **Desk unseen**. `Data → Link` done; patch linked 49 refs to 12 records |
 | A1.4 | Split transactions | 🟡 | `feat/phase-3-splits` | Code + 25 tests green; **Desk unseen**. Engine untouched, as designed |
 | A1.5 | Transfer fees | 🟡 | `feat/phase-3-transfer-fees` | Code + 22 tests green; **Desk unseen**. Restated the balance-sheet-only invariant |
-| A1.6 | Reconciliation | ⬜ | | `reference_no`, `is_reconciled`, `cleared_date` |
-| A1.7 | Bills and reminders | ⬜ | | A bill is a claim; a plan is a schedule |
+| A1.6 | Reconciliation | 🟡 | `feat/phase-3-a1-rest` | 20 tests. Changes no money; no adjustment entry, on purpose |
+| A1.7 | Bills and reminders | 🟡 | `feat/phase-3-a1-rest` | 41 tests. Mark Paid posts and mints the next; daily reminder job |
 
 ### A2 — productivity
 
@@ -107,6 +110,25 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from A1.2 / A1.6 / A1.7
+
+- **A receipt is a standalone doctype, not a child table**, and `transaction` is optional.
+  Paper is photographed at the till and typed up on Sunday; a child row cannot exist without a
+  parent. That also makes the unattached ones a real thing to show — an inbox.
+- **Reconciliation changes no money and offers no adjustment entry.** If the difference does
+  not close, the answer is a missing or wrong transaction. An app that plugs the gap has
+  stopped being a ledger.
+- **A bill is a claim; a plan is a schedule.** The giveaway is *overdue* — a state a standing
+  order cannot have. If a plan has not posted the scheduler is broken; if a bill has not been
+  paid, a person has not paid it. They compose: a bill may name the plan that settles it.
+- **A repeating bill mints its successor when it is paid**, one open bill at a time. Twelve
+  unpaid rows up front would make "what do I owe" meaningless and fire every reminder eleven
+  times.
+- **Bill names are unique per tracker only among *unpaid* bills** — unlike every other master
+  here — because a repeating bill reuses its own name every month.
 
 ---
 
@@ -199,6 +221,7 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-22 | **A1 complete.** Receipts, reconciliation and bills shipped; 715 tests. |
 | 2026-08-22 | A1.5 transfer fees shipped; 639 tests. Restated the balance-sheet-only invariant in architecture.md. |
 | 2026-08-22 | A1.4 splits shipped; 617 tests. Category roll-ups and budgets made split-aware; fixed a whole-tracker budget double-count. |
 | 2026-08-22 | A1.3 merchants shipped; 592 tests. `Transaction.merchant` Data → Link, backfilled by `patches/v1_1/link_merchants`. Fixed a remark regression and a silently-broken merchant search. |

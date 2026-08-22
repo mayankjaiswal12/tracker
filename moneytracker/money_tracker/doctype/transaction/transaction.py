@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, fmt_money
+from frappe.utils import flt, fmt_money, getdate
 
 from moneytracker.money_tracker.posting import engine
 from moneytracker.money_tracker.services import fx
@@ -35,6 +35,7 @@ class Transaction(Document):
 		# is stamped with its own base amount at that rate.
 		self.validate_splits()
 		self.validate_fee()
+		self.validate_reconciliation()
 
 	def apply_merchant_defaults(self):
 		"""Let the merchant fill in what has been left blank, and nothing else.
@@ -210,6 +211,26 @@ class Transaction(Document):
 
 		self.fee_base_amount = flt(self.fee_amount) * (flt(self.exchange_rate) or 1.0)
 
+	def validate_reconciliation(self):
+		"""Ticking a line off a statement, and the date the statement says it cleared.
+
+		Neither field is about the money — they record that a human has seen this line on a
+		bank statement — which is why both carry `allow_on_submit` alongside `tags`. A
+		reconciliation that could only happen before submission would be useless: the statement
+		arrives weeks later.
+
+		The date defaults to the transaction's own rather than to today, because the common
+		case is a line that cleared when it was made and the uncommon one is a cheque that took
+		a fortnight.
+		"""
+		if not self.is_reconciled:
+			self.cleared_date = None
+			return
+		if not self.cleared_date:
+			self.cleared_date = self.date
+		if getdate(self.cleared_date) < getdate(self.date):
+			frappe.throw(_("Cleared Date cannot be before the transaction's own date."))
+
 	def validate_tags(self):
 		"""Tags must belong to this tracker, and each may appear once.
 
@@ -260,6 +281,7 @@ class Transaction(Document):
 		rather than trusted to have happened at insert.
 		"""
 		self.validate_tags()
+		self.validate_reconciliation()
 
 	def before_submit(self):
 		engine.check_sufficient_balance(self)
