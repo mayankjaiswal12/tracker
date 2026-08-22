@@ -171,9 +171,7 @@ class TestDemoGoals(MoneyTrackerTestCase):
 
 	def test_the_plan_shows_every_measure_at_least_once(self):
 		"""The point of the demo set: each measure in GOAL_TYPES visible on the workspace."""
-		self.assertEqual(
-			{row["goal_type"] for row in demo.DEMO_GOALS}, set(goals.GOAL_TYPE_OPTIONS)
-		)
+		self.assertEqual({row["goal_type"] for row in demo.DEMO_GOALS}, set(goals.GOAL_TYPE_OPTIONS))
 
 	def test_every_goal_names_an_account_the_demo_creates(self):
 		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
@@ -316,3 +314,22 @@ class TestDemoRoundTrip(MoneyTrackerTestCase):
 					demo.setup_demo_data(months=1, tracker_name=name)
 			finally:
 				demo.clear_demo_data(tracker=summary["tracker"])
+
+
+class TestTeardownLeavesNothingBehind(MoneyTrackerTestCase):
+	"""Transactions are cleared by raw table delete, so their child rows must go by hand."""
+
+	def test_the_child_table_list_matches_the_doctype(self):
+		"""Derived from the meta, so adding a child table and forgetting the teardown fails here
+		rather than leaving orphan rows nobody sees until something counts them."""
+		declared = set(demo.TRANSACTION_CHILD_TABLES)
+		actual = {
+			field.options
+			for field in frappe.get_meta("Transaction").fields
+			if field.fieldtype in ("Table", "Table MultiSelect")
+		}
+		self.assertEqual(
+			declared,
+			actual,
+			"demo.TRANSACTION_CHILD_TABLES is out of step with Transaction's child tables",
+		)

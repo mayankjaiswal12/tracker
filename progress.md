@@ -13,14 +13,14 @@ green *and* it has been looked at in Desk.
 | | |
 |---|---|
 | Branch | `feat/phase-3-a1-rest` |
-| Tests | **715 green**, ~89s |
+| Tests | **716 green**, ~89s |
 | Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`) |
 | Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits · A1.5 transfer fees · **A1 complete** |
 | **Blocking** | **The manual Desk pass — owed since Phase 1, deferred four times** |
 
-### The one thing owed
+### The one thing owed — now actually clickable
 
-The manual Desk pass (`docs/manual-test-desk.md`). 715 automated tests say the arithmetic is
+The manual Desk pass (`docs/manual-test-desk.md`). 716 automated tests say the arithmetic is
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
@@ -110,6 +110,27 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from closing the Desk gaps
+
+- **Three A1 modules had no UI at all.** The bill cards existed as API methods with no Number
+  Card fixtures, `mark_paid` was whitelisted but had no button, and the reconciliation service
+  had nothing calling it. Built as backend, never wired.
+- **`clear_demo_data` was leaving orphaned child rows.** Transactions are removed by raw table
+  delete — deliberately, since there can be hundreds and the GL rows go separately — which
+  bypasses `delete_doc` and never touched child tables. Correct until A1 gave `Transaction`
+  two of them. `demo.TRANSACTION_CHILD_TABLES` now names them and a test derives the same list
+  from the doctype meta, so adding a third and forgetting the teardown fails rather than
+  orphaning rows.
+- **Two demo day references pointed at the wrong rows.** `DEMO_TAGGED` named day 10, which is a
+  **Transfer** — tagging one is legal and completely invisible, since a movement has no category
+  and never appears in the Expense view. It read as a working demo with an empty chart bar. Both
+  the missing-day and the not-an-expense cases now throw.
+- **`transactions_posted` now counts the tracker rather than the plan loop.** The loop knows
+  about MONTHLY and ONE_OFFS; it did not know about the split that is cancelled and re-posted
+  or the transfer carrying a fee.
 
 ---
 

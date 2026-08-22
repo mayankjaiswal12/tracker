@@ -855,13 +855,123 @@ Income **1,20,000** and Expense **39,699** for every month after this one.
 
 ---
 
-## 16. Cleanup (optional)
+## 17. Tags — the same money read a second way
+
+Everything in §17–§21 is on the **demo household**, which now seeds all of it. Nothing needs
+creating first.
+
+Open **Money Tag** from the workspace (Quick Actions). Three: `Family`, `Essentials`, `Treats`.
+
+1. Open a grocery transaction — filter Transaction by category **Groceries**, pick one dated
+   the 8th. The **Tags** field is a pill widget, not a grid. It should show `Family` and
+   `Essentials`.
+2. **Add a third tag to it.** The transaction is *submitted*: `tags` is one of only three
+   fields on Transaction that may change after submission. An Update button should appear and
+   the save should stick. If Desk refuses, `allow_on_submit` has not migrated.
+3. Open the tag picker on a transaction and confirm it offers **only this tracker's** tags.
+4. Remove the third tag again.
+
+**Expected totals** — `Essentials` ₹24,000 · `Family` ₹18,400 · `Treats` ₹4,800.
+
+The rows sum to **₹47,200** but only **₹28,800** is tagged, because `Family` always appears
+beside another tag. That gap is the point of tags and is why they are drawn as a ranked bar and
+never as a pie.
+
+## 18. Splits — one payment, several categories
+
+Filter Transaction by **date = 8th** of the most recent complete month and find the grocery
+run of **₹6,800**.
+
+1. It has **no category** — the Category field is empty. A split transaction has no single one.
+2. The **Split Across Categories** grid holds two rows: Groceries **5,440** and Household
+   **1,360**.
+3. Open the linked **Journal Entry**. It has **three** lines: two debits and one credit of
+   6,800.
+4. On a *new* Expense, add two split rows that do **not** add up to the amount. The error
+   should name both figures.
+5. Change the transaction type to **Transfer**. The Splits section should disappear and any
+   rows should clear.
+
+## 19. Transfer fees
+
+Find the Transfer of **₹25,000** dated the 8th of the current month.
+
+1. The **Fee** section shows 50, charged to `Bank Charges & Fees`.
+2. Its Journal Entry has **three** lines — destination 25,000, fee 50, source credited
+   **25,050**. The destination receives what was sent; the source pays the charge on top.
+3. Switch a new transaction between Expense and Transfer and watch the Fee section appear and
+   disappear. On an Expense, entering a fee should be refused: every other type already has a
+   category of its own.
+4. Check the fee reaches spending — the `Bank Charges & Fees` category total should include it.
+   This is the one part of a transfer that is expense.
+
+## 20. Reconciliation
+
+Open **Money Account → HDFC Bank** and press **Reconcile**.
+
+1. Enter today's date and a closing balance of **69,500**. The dialog should read
+   *book 2,19,950 · ticked off 69,500 · difference 0* and say the account agrees.
+   The first demo month is seeded already reconciled, which is why it is not zero.
+2. Enter **70,000** instead. The difference should read **500** in red, with the note that a
+   transaction is missing or wrong — there is deliberately **no adjustment button**.
+3. Tick two lines from the unticked list and confirm. The cleared balance moves; **the account
+   balance does not**. Reconciling changes no money.
+4. Open one of them: **Reconciled** is ticked and **Cleared Date** is filled. Both are editable
+   on a submitted transaction, because the statement arrives weeks later.
+
+## 21. Bills, receipts and merchants
+
+**Bills** — three are seeded.
+
+| Bill | Amount | Expect |
+|---|---|---|
+| Society Maintenance | ₹2,500 | **Overdue** — the one state a standing order cannot have |
+| Broadband | ₹1,199 | Upcoming, due in a few days |
+| Water Bill | *Varies* | Upcoming; the Amount field is hidden |
+
+1. The block at the top of each form shows the amount, an outcome pill and the days to go.
+2. Press **Mark Paid** on Broadband. The dialog pre-fills the amount; confirm. It should post a
+   Transaction, flip the bill to Paid, and — because it repeats monthly — **mint the next one**,
+   linking to both in the alert. Check only **one** unpaid Broadband exists afterwards.
+3. Press **Mark Paid** on Water Bill. The amount is **not** pre-filled, because it varies.
+4. On the workspace, the **Bills** section shows **Bills Due ₹3,699** and **Overdue Bills
+   1 overdue**. After paying Broadband, Bills Due changes.
+
+**Receipts** — open **Money Receipt**. Two: one attached to a restaurant transaction, one in the
+inbox with no transaction at all. The files do not exist on disk, so previews will be broken —
+that is expected; the record shape is what is being checked. Upload a real JPG to one and
+confirm a thumbnail appears; upload a PDF and confirm it does not.
+
+**Merchants** — open **Money Merchant**. Twelve, created by the migration from the old free-text
+field. Note `Netflix, Spotify`, `Auto, bus` and `IRCTC, hotel` — the field had been used as a
+note, and the migration recorded what was written rather than guessing at a split. Set a
+**Default Category** on `DMart`, then start a new Expense and pick DMart as merchant: the
+category should fill itself in, and should **not** overwrite one you typed first.
+
+Top merchants: `Landlord` ₹1,75,000 (47.0%) · `Croma` ₹36,800 · `DMart` ₹34,000 ·
+`Reliance Fresh` ₹26,000. Unlike tags, these **do** add up — a transaction has one merchant.
+
+## 22. What is deliberately not wired
+
+Not defects; scope not yet reached. Do not raise these as bugs.
+
+- No **Spending by Tag** or **Top Merchants** chart on the workspace. The services and APIs
+  exist; the chart fixtures are A3.
+- No **report** anywhere in the app — `report/` does not exist yet. ERPNext's five reports are
+  still the only ones, under Ledger & Reports.
+- The **receipt inbox** has no screen of its own; `api/receipts.get_unattached` returns it, but
+  you reach unattached receipts through the Money Receipt list.
+- Split and fee category pickers are filtered to expense leaves, but the **grid does not show a
+  running total** of the split rows against the amount.
+
+## 23. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
-2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14 and the `DT *`
-   plans from §15 — none is submittable, so they just delete. Deleting a plan leaves the
+2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14, the `DT *`
+   plans from §15 and any `DT *` bills, tags, merchants or receipts from §17–§21 — none is
+   submittable, so they just delete. Deleting a plan leaves the
    transactions it posted behind, with the link cleared; cancel and delete those with the rest.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
 4. Delete `DT Bank`, `DT SBI`, `DT Card`.

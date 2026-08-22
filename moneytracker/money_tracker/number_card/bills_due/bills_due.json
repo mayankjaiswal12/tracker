@@ -1,0 +1,19 @@
+{
+ "creation": "2026-08-22 22:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Money Bill",
+ "filters_json": "{}",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Bills Due",
+ "method": "moneytracker.money_tracker.api.bills.card_bills_due",
+ "modified": "2026-08-22 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Bills Due",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "type": "Custom"
+}
