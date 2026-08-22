@@ -19,9 +19,9 @@ it an analyst. Either can be dropped without stranding the other, and neither bl
 except where §4 names a dependency.
 
 Read ``CLAUDE.md`` for conventions, ``docs/architecture.md`` for why the ledger is ERPNext's,
-``task.md`` for the current resume point, ``plan.md`` for the decisions register and
-``progress.md`` for what is actually built. **This document plans; it does not record.**
-Nothing here is built.
+``task.md`` for the current resume point, ``plan.md`` for the per-module build recipe and
+``progress.md`` for what is actually built. The decisions behind everything below are §5 of
+this document. **This document plans; it does not record.** Nothing here is built.
 
 .. contents::
    :local:
@@ -804,3 +804,124 @@ that cannot be evaluated, which is worse than no advice, because it looks like a
 
 Per the standing instruction, each module goes on **its own branch** and committing is the
 user's.
+
+
+§5 · Decisions register
+=======================
+
+Each entry is settled. Re-open one only with a reason that is new, and amend the entry rather
+than arguing beside it. Sections above state *what* is to be built; this states *why the
+boundaries sit where they do*.
+
+D1 — One app, two independent tracks
+------------------------------------
+
+Part A (expense-manager parity) and Part B (financial analyst) live in ``moneytracker`` as new
+``Money *`` DocTypes, with **separate phase ladders**. Either can be dropped without stranding
+the other.
+
+*Rejected:* a second Frappe app. Every analyst ratio reads the same ``GL Entry`` rows the
+dashboard already reads, and a cross-app boundary would mean forking ``permissions.py`` — the
+app's only tenant isolation, and therefore security code.
+
+D2 — ML runs in-bench, in three tiers, behind one interface
+-----------------------------------------------------------
+
+The bench venv has **no numpy, pandas, scipy or scikit-learn**; it has ``pypdf``, ``openpyxl``,
+``xlrd``, ``rq``, ``redis``, Python 3.12. That fact decided this. The tier table is in
+*ML: three tiers, one interface* above; the reasoning is here.
+
+The brief's "separate ML services" is honoured as a **module** boundary, not a **process** one.
+For one household — thousands of rows — a separate service buys horizontal scale that will
+never be needed and costs a deployment, an auth contract and a second failure mode. Tier 0 is
+not a placeholder: nothing in the analyst brief is blocked on installing a scientific stack.
+Tier 2 exists so that stops being an assumption and becomes a switch.
+
+D3 — "Derive, never store" keeps two documented exceptions
+-----------------------------------------------------------
+
+The app measures figures from ``GL Entry`` on read. Part B breaks that twice, deliberately:
+
+- **External observations are stored** — a stock price, a reported EPS, a cohort benchmark.
+  There is no ledger to re-derive them from. Every row carries ``source``, ``as_of``,
+  ``ingested_on``.
+- **Advice snapshots are immutable** — an audit trail records what was said, not what would be
+  said now.
+
+Everything personal — ratios, savings rate, cash flow, runway, allocation — **stays derived**.
+
+D4 — Point-in-time correctness is mandatory
+--------------------------------------------
+
+A recommendation is computed from data as it was known at the decision date. A transaction
+dated 3 July but entered on 20 August must not appear in an "as of 31 July" figure, or every
+backtest of the rule engine carries look-ahead bias and no threshold can ever be validated.
+
+``GL Entry`` has both ``posting_date`` and ``creation``, so this is a filter, not a schema
+change: one helper in ``services/analyst/asof.py``. The app already found this asymmetry once,
+in ``recurring.effective_from`` — *a plan reaches forward, not back*. D4 generalises it.
+
+D5 — Recommendations are scored against what happened
+-------------------------------------------------------
+
+``Money Recommendation`` stores the advice and its inputs; a scheduled job writes
+``Money Recommendation Outcome`` N periods later.
+
+*Not in either brief.* Without it there is no label set for Tier-1 ML, no evidence any
+threshold is right, and no way to tell a good recommendation from a confident one.
+
+D6 — Confidence is data sufficiency, not model output
+-------------------------------------------------------
+
+Defined once in ``services/analyst/confidence.py`` from five observables: months of history,
+share of days with any transaction, share of spend uncategorised, account coverage, days since
+last import. Every recommendation is gated on it and weakens as it falls.
+
+D7 — Shared masters are not tracker-scoped; holdings are
+----------------------------------------------------------
+
+A stock price is the same fact for every user. ``Money Security``, ``Money Price``,
+``Money Fundamental``, ``Money Sector``, ``Money Benchmark`` carry ordinary role permissions and
+are **deliberately** outside ``permissions.py``. Say so in their docstrings so nobody "fixes"
+it. Holdings, portfolios, recommendations and every ingestion artefact are scoped.
+
+D8 — Desk and mobile, off one versioned API
+---------------------------------------------
+
+Desk stays the operator surface. Mobile targets ``moneytracker/api/v1/``, kept separate from
+today's unversioned ``api/``: ``client_uuid`` idempotency keys on write, a ``modified``-cursor
+sync endpoint, ``Money Sync Log`` for conflicts. PIN lock is a client concern; the server
+exposes nothing for it.
+
+D9 — Reuse the platform
+------------------------
+
+Confirmed present in this bench and **not to be rebuilt**: ``Version`` (audit trail),
+``Activity Log``, ``Access Log``, ``Notification Log``, ``Tag``, ``Data Import``,
+``Prepared Report``, ``Google Drive`` / ``Dropbox Settings`` / ``S3 Backup Settings``,
+``Auto Repeat``. ERPNext supplies General Ledger, Trial Balance, Balance Sheet, P&L and Cash
+Flow, already per-tracker.
+
+**One exception:** core ``Tag Link`` does **not** exist in this Frappe version. Tags live in
+``_user_tags``, a comma-joined text column that cannot be aggregated — so tag *analytics* needs
+a real child table.
+
+D10 — Every module gets a registry table
+------------------------------------------
+
+A frozen dataclass, a module-level dict, ``OPTIONS = tuple(REGISTRY)`` pinned by a test against
+the DocType Select, and a ``get_x()`` that throws listing valid names. ``GOAL_TYPES``,
+``PERIODS``, ``FREQUENCIES``, ``ACCOUNT_TYPE_MAP`` and ``STRATEGIES`` are this pattern five
+times; ``RATIOS``, ``RULES``, ``SCENARIOS``, ``RISK_BANDS``, ``INGEST_PARSERS`` make it ten.
+Adding a variant is a dict row and one small function.
+
+D11 — Documentation formats
+-----------------------------
+
+This file is reStructuredText at the user's request. The rest of ``docs/`` remains Markdown
+(``architecture.md``, ``manual-test-desk.md``). If more docs go RST, convert the set rather than
+letting the split widen.
+
+``plan.md`` and ``task.md`` are both in ``.gitignore``, under the *Claude / AI context* block
+alongside ``CLAUDE.md`` — deliberate, and the reason this register lives here rather than
+there: a decisions register that is not in the repository is not a decisions register.
