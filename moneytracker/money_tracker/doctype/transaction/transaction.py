@@ -22,13 +22,47 @@ class Transaction(Document):
 			self.company = settings_service.get_company()
 		if not self.currency:
 			self.currency = frappe.db.get_value("Money Account", self.account, "currency")
+		self.apply_merchant_defaults()
 
 	def validate(self):
 		self.validate_amount()
 		self.validate_accounts()
 		self.validate_category()
 		self.validate_tags()
+		self.validate_merchant()
 		self.set_base_amount()
+
+	def apply_merchant_defaults(self):
+		"""Let the merchant fill in what has been left blank, and nothing else.
+
+		A default is a convenience on entry, not a rule: it only ever fills an empty field, so
+		editing a merchant never rewrites what is already saved, and a category typed by hand
+		always wins. Runs in `before_validate` so `validate_category` still gets the last word
+		on whatever ends up there.
+		"""
+		if not self.merchant or self.transaction_type in ACCOUNT_TO_ACCOUNT_TYPES:
+			return
+
+		defaults = frappe.db.get_value(
+			"Money Merchant", self.merchant, ["default_category", "default_payment_method"], as_dict=True
+		)
+		if not defaults:
+			return
+		if not self.category:
+			self.category = defaults.default_category
+		if not self.payment_method:
+			self.payment_method = defaults.default_payment_method
+
+	def validate_merchant(self):
+		"""A merchant from another tracker would quietly mix two households' spending."""
+		if not self.merchant:
+			return
+
+		merchant_tracker, merchant_name = frappe.db.get_value(
+			"Money Merchant", self.merchant, ["tracker", "merchant_name"]
+		)
+		if merchant_tracker and merchant_tracker != self.tracker:
+			frappe.throw(_("Merchant {0} belongs to another tracker.").format(frappe.bold(merchant_name)))
 
 	def validate_amount(self):
 		if flt(self.amount) <= 0:

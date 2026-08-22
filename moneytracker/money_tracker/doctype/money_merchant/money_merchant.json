@@ -1,0 +1,180 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "MER-.#####",
+ "creation": "2026-08-22 16:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "basics_section",
+  "merchant_name",
+  "tracker",
+  "is_active",
+  "column_break_basics",
+  "default_category",
+  "default_payment_method",
+  "defaults_note",
+  "contact_section",
+  "phone",
+  "email",
+  "website",
+  "column_break_contact",
+  "address",
+  "matching_section",
+  "match_patterns",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Who the money went to, or came from. Kept per tracker, like Category and unlike Money Payment Method — a household's list of shops is its own, while the ways of paying are a small closed set everybody shares.",
+   "fieldname": "merchant_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Merchant Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "1",
+   "description": "An inactive merchant stays on the transactions that already name it and stops being offered on new ones.",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Filled in on a new transaction when no category has been chosen. Never overwrites one that has.",
+   "fieldname": "default_category",
+   "fieldtype": "Link",
+   "label": "Default Category",
+   "options": "Category"
+  },
+  {
+   "fieldname": "default_payment_method",
+   "fieldtype": "Link",
+   "label": "Default Payment Method",
+   "options": "Money Payment Method"
+  },
+  {
+   "fieldname": "defaults_note",
+   "fieldtype": "HTML",
+   "options": "<p class=\"text-muted small\">Defaults are a convenience on entry, not a rule. Nothing already saved is changed by editing them.</p>"
+  },
+  {
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Contact"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_contact",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "matching_section",
+   "fieldtype": "Section Break",
+   "label": "Matching"
+  },
+  {
+   "description": "One fragment per line, matched case-insensitively against an imported statement's description. Nothing reads these yet — they are what a later importer and auto-detection will match on.",
+   "fieldname": "match_patterns",
+   "fieldtype": "Small Text",
+   "label": "Match Patterns"
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-22 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Merchant",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "merchant_name"
+}

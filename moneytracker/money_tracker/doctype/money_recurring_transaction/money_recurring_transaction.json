@@ -220,10 +220,12 @@
    "label": "Details"
   },
   {
-   "description": "Copied onto every occurrence.",
+   "description": "Copied onto every occurrence this plan posts.",
    "fieldname": "merchant",
-   "fieldtype": "Data",
-   "label": "Merchant"
+   "fieldtype": "Link",
+   "label": "Merchant",
+   "options": "Money Merchant",
+   "search_index": 1
   },
   {
    "fieldname": "payee",
@@ -266,7 +268,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-22 10:00:00.000000",
+ "modified": "2026-08-22 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Money Tracker",
  "name": "Money Recurring Transaction",

@@ -14,7 +14,8 @@ from frappe.utils import flt
 
 from moneytracker.money_tracker.posting import strategies
 from moneytracker.money_tracker.posting.context import PostingContext
-from moneytracker.money_tracker.services import balances, coa, settings as settings_service
+from moneytracker.money_tracker.services import balances, coa
+from moneytracker.money_tracker.services import settings as settings_service
 
 # ERPNext voucher types are a fixed Select. Map our richer set onto the closest stock
 # value and let Transaction.transaction_type carry the real semantics.
@@ -141,9 +142,18 @@ def _recompute(money_accounts):
 
 
 def _build_remark(transaction):
+	"""The one-line description ERPNext's General Ledger prints against the Journal Entry.
+
+	`merchant` is a Link, so the field holds `MER-00007` and the readable name has to be looked
+	up — a remark reading "Expense | MER-00007 | lunch" would be worse than no merchant at all,
+	and it is the kind of thing that only ever gets noticed in a report months later.
+	"""
 	parts = [transaction.transaction_type]
 	if transaction.merchant:
-		parts.append(transaction.merchant)
+		parts.append(
+			frappe.db.get_value("Money Merchant", transaction.merchant, "merchant_name")
+			or transaction.merchant
+		)
 	if transaction.notes:
 		parts.append(transaction.notes)
 	return " | ".join(parts)

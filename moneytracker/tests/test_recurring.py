@@ -27,6 +27,7 @@ from moneytracker.tests.utils import (
 	backdate_plan,
 	make_account,
 	make_category,
+	make_merchant,
 	make_recurring,
 	make_tracker,
 	make_user,
@@ -191,9 +192,10 @@ class TestGeneration(PlanFixture):
 		self.assertTrue(transaction.journal_entry, "an automatic plan posts to the ledger")
 
 	def test_the_template_fields_are_copied_onto_every_occurrence(self):
-		plan = self.plan(merchant="Landlord", payee="Mrs Rao", notes="First of the month")
+		landlord = make_merchant(self.tracker.name, merchant_name="Landlord")
+		plan = self.plan(merchant=landlord.name, payee="Mrs Rao", notes="First of the month")
 		transaction = frappe.get_doc("Transaction", recurring.generate(plan)[0])
-		self.assertEqual(transaction.merchant, "Landlord")
+		self.assertEqual(transaction.merchant, landlord.name)
 		self.assertEqual(transaction.payee, "Mrs Rao")
 		self.assertEqual(transaction.notes, "First of the month")
 
