@@ -65,7 +65,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
-| — | **Manual Desk pass** | 🟡 | `feat/phase-2-recurring` | Gate for everything below |
+| — | **Manual Desk pass** | ⏸ | `feat/phase-a2-loans` | Gate for everything below. Deferred eight times; the user said on 2026-08-23 they would do it later, so it is queued rather than blocking |
 | A1.1 | Tags | 🟡 | `feat/phase-3-tags` | Code + 33 tests green; **Desk unseen**. Tag totals overlap by design; `total`/`tagged` measured without the join |
 | A1.2 | Receipts and attachments | 🟡 | `feat/phase-3-a1-rest` | 15 tests. Standalone doctype, not a child table — paper is captured before it is entered |
 | A1.3 | Merchant master | 🟡 | `feat/phase-3-merchants` | Code + 36 tests green; **Desk unseen**. `Data → Link` done; patch linked 49 refs to 12 records |
@@ -250,6 +250,12 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
   from a voucher whose own `category` is empty, and both had to be added to
   `get_category_totals` *and* `get_net_spend_by_date`. Any future way of attaching money to a
   category needs the same two edits — that is now a pattern worth watching, not a coincidence.
+- **And two edits turned out not to be enough.** A2.2 (2026-08-23) found that a fee had never
+  reached `trends.get_period_series` either, so it was spending on the category roll-up and in
+  every budget while **not** being spending on "Expenses This Month" or the spending chart. The
+  two hand-written queries are now `categories.SIDE_CHARGES`, with `get_side_charges_by_date` as
+  the window form for the periods — so there are three call sites and one table, rather than three
+  places to remember.
 
 ---
 

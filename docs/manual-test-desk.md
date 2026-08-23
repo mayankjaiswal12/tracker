@@ -40,7 +40,7 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 ### Existing data
 
-Tracker **Demo Household** and its four accounts are the demo data
+Tracker **Demo Household** and its six accounts are the demo data
 (`money_tracker/demo.py`), **reseeded 2026-08-23 after A2.2**: 80 transactions over five months
 across **six** accounts, seven goals, five budgets, five standing orders, sixteen merchants, three
 tags, three bills, two receipts, **five subscriptions** and **two loans** — plus one split grocery
