@@ -1,11 +1,12 @@
 # Manual test run — Desk
 
 A click-through pass over everything Phase 1 implements, plus the three features that opened
-Phase 2: goals (§13), budgets (§14) and recurring transactions (§15). Every number below is
-pre-computed and was verified against the ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13,
-2026-08-19 for §14, 2026-08-20 for §15 — so you are checking arithmetic, not recomputing it.
+Phase 2 — goals (§13), budgets (§14) and recurring transactions (§15) — plus A1 (§17–§21) and
+A2.1 subscriptions (§22). Every number below is pre-computed and was verified against the
+ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13, 2026-08-19 for §14, 2026-08-20 for §15,
+2026-08-23 for §17–§22 — so you are checking arithmetic, not recomputing it.
 
-Roughly 45 minutes. Nothing here needs the terminal except the alert job in §14, the nightly
+Roughly an hour. Nothing here needs the terminal except the alert job in §14, the nightly
 job in §15, and two optional cross-checks.
 
 ---
@@ -40,10 +41,10 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 ### Existing data
 
 Tracker **Demo Household** and its four accounts are the demo data
-(`money_tracker/demo.py`), **reseeded 2026-08-22**: 72 transactions over five months, seven
-goals, five budgets, five standing orders, twelve merchants, three tags, three bills and two
-receipts — plus one split grocery run, one transfer carrying a fee, and the first month already
-reconciled. That is what the workspace cards and charts show.
+(`money_tracker/demo.py`), **reseeded 2026-08-23**: 72 transactions over five months, seven
+goals, five budgets, five standing orders, seventeen merchants, three tags, three bills, two
+receipts and **five subscriptions** — plus one split grocery run, one transfer carrying a fee,
+and the first month already reconciled. That is what the workspace cards and charts show.
 
 **Ignore it for §1–§15** — those create their own `DT *` set so the numbers stay clean — except
 §7, where the point is that the widgets read a populated tracker. **§17–§22 run entirely on the
@@ -868,7 +869,7 @@ Income **1,20,000** and Expense **39,699** for every month after this one.
 
 ## 17. Tags — the same money read a second way
 
-Everything in §17–§21 is on the **demo household**, which now seeds all of it. Nothing needs
+Everything in §17–§22 is on the **demo household**, which now seeds all of it. Nothing needs
 creating first.
 
 Open **Money Tag** from the workspace (Quick Actions). Three: `Family`, `Essentials`, `Treats`.
@@ -953,8 +954,8 @@ inbox with no transaction at all. The files do not exist on disk, so previews wi
 that is expected; the record shape is what is being checked. Upload a real JPG to one and
 confirm a thumbnail appears; upload a PDF and confirm it does not.
 
-**Merchants** — open **Money Merchant**. Twelve, created by the migration from the old free-text
-field. Note `Netflix, Spotify`, `Auto, bus` and `IRCTC, hotel` — the field had been used as a
+**Merchants** — open **Money Merchant**. Seventeen: twelve created by the migration from the old
+free-text field, and five vendors that came in with the subscriptions in §22. Note `Netflix, Spotify`, `Auto, bus` and `IRCTC, hotel` — the field had been used as a
 note, and the migration recorded what was written rather than guessing at a split. Set a
 **Default Category** on `DMart`, then start a new Expense and pick DMart as merchant: the
 category should fill itself in, and should **not** overwrite one you typed first.
@@ -962,26 +963,81 @@ category should fill itself in, and should **not** overwrite one you typed first
 Top merchants: `Landlord` ₹1,75,000 (47.0%) · `Croma` ₹36,800 · `DMart` ₹34,000 ·
 `Reliance Fresh` ₹26,000. Unlike tags, these **do** add up — a transaction has one merchant.
 
-## 22. What is deliberately not wired
+## 22. Subscriptions — the terms, where a plan holds only the money
+
+Five are seeded, one in every state a subscription can be in. Open **Money Subscription**
+from Quick Actions.
+
+| Subscription | Billed | Expect |
+|---|---|---|
+| Adobe Photoshop | ₹12,999 Yearly | **Cancel By** — the notice window is closing |
+| Notion AI | ₹800 Monthly | **Trial Ending** — free until the trial runs out |
+| Netflix | ₹649 Monthly | **Renewing Soon**, and a price history: it was ₹499 |
+| Gym Membership | ₹1,500 Monthly | **Paused** — costs nothing, still on the list |
+| Cloud Storage | ₹199 Monthly | **Cancelled**, and still being paid for until its end date |
+
+1. The block at the top of each form shows the price, an outcome pill, what it costs **a
+   month**, and the renewal date. Adobe is billed yearly, so its monthly figure is
+   **₹1,083.25** — the one number that lets it be compared with Netflix.
+2. Open **Netflix** and look at **Price History**: two rows, ₹499 from the start and ₹649 from
+   June. The block says *Was ₹499 → ₹649*. **Now type ₹749 over the price and save** — a third
+   row appears, dated today, and the old ones stay. That is the whole rule: the history is the
+   truth and the field is a cache of the newest row. Set it back to ₹649 afterwards (which
+   correctly leaves *today's* row saying 649, not a fourth row).
+3. Press **Record Price Change** on any of them and give it a date in the past. The point of
+   the dialog is the date: a letter saying the price went up on the 1st arrives on the 9th.
+4. Open **Adobe Photoshop**. It has a ten-day notice period, so the block carries a **Cancel
+   by** date that is *earlier* than the renewal. That date is the only thing in this app a
+   standing order cannot express, and it is why the doctype exists.
+5. Open **Notion AI**. It is in a trial, so **Subscription Spend does not include its ₹800** —
+   nobody is paying for it yet. It is the only state in the app where doing nothing costs money.
+6. Open **Cloud Storage**: cancelled, with an end date in the future, and **still counted** in
+   Subscription Spend. Cancelling in August does not stop the money going out in September.
+7. Press **Cancel Subscription** on the Gym. The dialog asks what date it runs until, not for a
+   confirmation — that is the same rule.
+8. Check the refusals: a second subscription called `Netflix` on this tracker, a price of zero,
+   a trial ending before the start date, an end date before the start date.
+9. **Link one to a plan.** Set *Paid By Plan* on Netflix to `Streaming Subscriptions` and save.
+   The block gains a line: **the plan paying it charges something else** — the plan is ₹1,499
+   because it pays for Netflix *and* Spotify. That is reported, never refused: knowing about a
+   price rise before the standing order is updated is the normal order of events. Now try to
+   put the same plan on Cloud Storage — refused, because one plan pays one subscription or its
+   money is counted twice. Clear the link again when you are done.
+10. On the workspace, the **Subscriptions** section shows **Subscription Spend ₹1,931.25**
+    (Adobe 1,083.25 + Netflix 649 + Cloud Storage 199) and **Trials Ending 1 ending**.
+
+✅ **The key check:** Subscription Spend and Fixed Costs **overlap on purpose** and are never
+added together. Fixed Costs is what leaves the account every month; Subscription Spend is what
+you are signed up to. A household cancels a subscription, not a standing order.
+
+✅ Note that **Money Merchant now holds 17**, not twelve — the five vendors above were created
+alongside the subscriptions. `Netflix` and `Netflix, Spotify` both exist, which is the honest
+picture: the second came from the old free-text field and the first was typed as a vendor.
+
+## 23. What is deliberately not wired
 
 Not defects; scope not yet reached. Do not raise these as bugs.
 
 - No **Spending by Tag** or **Top Merchants** chart on the workspace. The services and APIs
   exist; the chart fixtures are A3.
 - No **report** anywhere in the app — `report/` does not exist yet. ERPNext's five reports are
-  still the only ones, under Ledger & Reports.
+  still the only ones, under Ledger & Reports. *Subscriptions by Renewal* is named in the A2.1
+  spec and is deliberately not built: `services/subscriptions.get_renewals` already returns the
+  figure, and the report is A3 along with the rest of `report/`.
+- No **subscription chart** on the workspace, for the same reason as the tag and merchant ones.
 - The **receipt inbox** has no screen of its own; `api/receipts.get_unattached` returns it, but
   you reach unattached receipts through the Money Receipt list.
 - Split and fee category pickers are filtered to expense leaves, but the **grid does not show a
   running total** of the split rows against the amount.
 
-## 23. Cleanup (optional)
+## 24. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
 2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14, the `DT *`
-   plans from §15 and any `DT *` bills, tags, merchants or receipts from §17–§21 — none is
+   plans from §15 and any `DT *` bills, tags, merchants, receipts or subscriptions from
+   §17–§22 — none is
    submittable, so they just delete. Deleting a plan leaves the
    transactions it posted behind, with the link cleared; cancel and delete those with the rest.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
@@ -1018,6 +1074,11 @@ Two things deliberately survive and are safe to leave:
   one missed occurrence — §15 is monthly throughout and every plan there is one day old. Both
   are covered by the automated suite, along with the `MAX_PER_RUN` bound and the savepoint that
   keeps one broken plan from stopping the nightly job.
+- A **Daily, Weekly or Fortnightly** billed subscription, and one measured across a window in
+  which its price changed — §22 is monthly and yearly throughout, and reads the price as of one
+  day. Both are covered by the automated suite, along with the `Notice Passed` outcome, which
+  the demo deliberately does not seed: it is a fact nobody can act on, so it is not worth a
+  click-through.
 - A budget measured **while its period is still running**. §14 clamps every envelope to a
   closed August on purpose, so its figures read the same whenever you run it; the demo
   household's five budgets are the live case, and their pace markers sit mid-bar.

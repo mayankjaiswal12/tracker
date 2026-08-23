@@ -8,15 +8,15 @@ green *and* it has been looked at in Desk.
 
 ---
 
-## Where we are — 2026-08-22
+## Where we are — 2026-08-23
 
 | | |
 |---|---|
-| Branch | `feat/phase-3-a1-rest` |
-| Tests | **716 green**, ~89s |
-| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`) |
-| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits · A1.5 transfer fees · **A1 complete** |
-| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred four times** |
+| Branch | `feat/phase-a2-subscriptions`, off `feat/phase-3-a1-rest` |
+| Tests | **798 green**, ~97s |
+| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`), reseeded 2026-08-23 |
+| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1 complete** · **A2.1 subscriptions** |
+| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred five times** |
 
 ### The one thing owed — now actually clickable
 
@@ -24,7 +24,9 @@ The manual Desk pass (`docs/manual-test-desk.md`). 716 automated tests say the a
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
-It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in a browser.
+It gates all of A1 and now A2.1 as well. Nothing further should land on a Phase 1 nobody has
+looked at in a browser — `docs/manual-test-desk.md` is now §1–§15 plus §17–§22, with cleanup at
+§24, and every A1 and A2.1 figure in it was re-verified against the reseeded demo on 2026-08-23.
 
 ---
 
@@ -32,6 +34,7 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 | Module | Date | Branch | Tests |
 |---|---|---|---|
+| `Money Subscription` — the terms, where a plan holds only the money | 2026-08-23 | `feat/phase-a2-subscriptions` | ✅ tests, Desk unseen |
 | `Money Bill` — money owed, tracked until settled | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
 | `Money Receipt` — the paper behind a transaction | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
 | Reconciliation — ticking off against a statement | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
@@ -73,7 +76,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
-| A2.1 | `Money Subscription` | ⬜ | | Boundary already drawn in `services/recurring.py` |
+| A2.1 | `Money Subscription` | 🟡 | `feat/phase-a2-subscriptions` | Code + 82 tests green; **Desk unseen**. Terms only — it posts nothing. Price history is the one stored series in the app. *Subscriptions by Renewal* deferred to A3 with the rest of `report/` |
 | A2.2 | `Money Loan` + `Loan Payment` strategy | ⬜ | | Clears one of nine `PLANNED` types |
 | A2.3 | Budget completion | ⬜ | | Account-wise, custom range, templates |
 | A2.4 | Recurring completion | ⬜ | | Skip Next, custom interval, pre-reminder |
@@ -110,6 +113,43 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from A2.1 (subscriptions)
+
+- **It is the first module that is neither a measurement nor a posting.** A goal, a budget and a
+  card all read the ledger; a plan writes to it. A subscription does neither: it records terms,
+  and the money either comes from the plan it links to or from somebody paying by hand. That is
+  why there is no strategy, no `generate()` and no Journal Entry anywhere in it.
+- **Price history had to be stored, and it is the only thing in this app that does.** Every
+  other figure is measured from `GL Entry` on read because a stored copy drifts. A price cannot
+  be measured from the ledger at all — a month somebody forgot to pay looks exactly like a month
+  the thing was free. So `Money Subscription Price` is the truth and `amount` is a cache of the
+  newest row, the same relationship `Money Account.current_balance` has with the ledger.
+- **The rule for keeping the two in step is about which one the user touched.** Field changed →
+  the history records it, dated today. Table changed → the field is brought back into line with
+  the newest row *by date*, which is not the last child row: a rise recorded after the fact lands
+  at the bottom of the grid.
+- **A trial anchors the billing calendar, rather than being a special case in every caller.**
+  `billing_start` is the day after the trial ends, so the same `recurring.next_date` gives the
+  first charge during a trial and every renewal after it, and the two can never disagree about
+  which day of the month it renews on.
+- **`is_committed` is decided by the dates, not by the outcome word.** The case that forced it:
+  a subscription cancelled in August with an end date in October is still being paid for until
+  October, and dropping it out of Subscription Spend the day somebody clicked Cancel would
+  understate two months of real money.
+- **`Subscription Spend` overlaps `Fixed Costs` on purpose.** A subscription paid by a standing
+  order is in both figures, and nothing sums them — the same honest overlap a tag total has with
+  a category total. They answer different questions, and a household cancels a subscription
+  rather than a standing order.
+- **One plan pays one subscription**, refused at save, or the plan's money is claimed twice. A
+  plan whose *amount* disagrees with the price is reported and never refused: knowing about a
+  rise before the standing order is updated is the normal order of events.
+- **`recurring.FREQUENCIES` is shared rather than copied.** A subscription billed quarterly and a
+  plan running quarterly are on the same calendar, and two tables of the same six words are two
+  tables that will disagree. `test_subscriptions.TestFormWiring` asserts the DocType's Select
+  matches that table, and that `status` offers only the user's own three decisions.
 
 ---
 
@@ -242,6 +282,7 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-23 | **A2.1 subscriptions shipped**; 798 tests. `Money Subscription` + `Money Subscription Price`, two cards, a Subscriptions workspace section, a daily reminder job, five demo subscriptions and `docs/manual-test-desk.md` §22. Demo household reseeded, so §7's demo figures moved. |
 | 2026-08-22 | **Docs brought up to date** — architecture.md, roadmap.rst (§0 verdicts + A1 marked built), task.md, CLAUDE.md, manual-test-desk.md. |
 | 2026-08-22 | **Desk gaps closed.** 11 cards, 21 shortcuts, Mark Paid + Reconcile dialogs, filtered pickers, demo seeds all of A1, manual-test-desk §17–§22. Fixed an orphaned-child-row bug in `clear_demo_data`. 716 tests. |
 | 2026-08-22 | **A1 complete.** Receipts, reconciliation and bills shipped; 715 tests. |

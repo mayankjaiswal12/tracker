@@ -331,10 +331,15 @@ posts rent automatically is not waiting for anything. A credit-card bill is.
 Phase A2 — productivity
 -----------------------
 
-**A2.1 · Money Subscription** — boundary already drawn in ``services/recurring.py``: vendor,
-plan name, trial end, renewal date, price-change history (``Money Subscription Price`` child
-table), notice period, ``status``. **Links to** a ``Money Recurring Transaction`` for the money;
-grows no second schedule. Card ``Subscription Spend``, report *Subscriptions by Renewal*.
+**A2.1 · Money Subscription** ✅ **built 2026-08-23.** Vendor, tier, trial end, notice period and
+price history (``Money Subscription Price``), linking to a ``Money Recurring Transaction`` for the
+money and growing no second schedule. It **posts nothing** — the first module here that is neither
+a measurement nor a posting — and its price history is the only stored series in the app, because
+nothing in ``GL Entry`` can distinguish a price rise from a month somebody forgot to pay. The
+renewal date is *derived* rather than stored (``recurring.next_date`` off a billing anchor that a
+trial moves), so there is no cached next date, exactly as a plan has none. Cards
+``Subscription Spend`` **and** ``Trials Ending``. The report *Subscriptions by Renewal* is
+deliberately deferred to A3 with the rest of ``report/`` — ``get_renewals`` already returns it.
 
 **A2.2 · Money Loan** — the case a Debt Payoff goal does *not* cover: amortisation. Principal,
 rate, tenure, EMI, start date, ``interest_type``, lender, ``direction`` (Borrowed / Lent),
@@ -727,7 +732,7 @@ rolls back per **class**, not per test.
      - A1
      - —
      - L
-   * - Subscriptions
+   * - Subscriptions ✅
      - A
      - A2
      - Bills
@@ -857,16 +862,22 @@ never be needed and costs a deployment, an auth contract and a second failure mo
 not a placeholder: nothing in the analyst brief is blocked on installing a scientific stack.
 Tier 2 exists so that stops being an assumption and becomes a switch.
 
-D3 — "Derive, never store" keeps two documented exceptions
------------------------------------------------------------
+D3 — "Derive, never store" keeps three documented exceptions
+------------------------------------------------------------
 
-The app measures figures from ``GL Entry`` on read. Part B breaks that twice, deliberately:
+The app measures figures from ``GL Entry`` on read. Part B breaks that twice and Part A once,
+all deliberately:
 
 - **External observations are stored** — a stock price, a reported EPS, a cohort benchmark.
   There is no ledger to re-derive them from. Every row carries ``source``, ``as_of``,
   ``ingested_on``.
 - **Advice snapshots are immutable** — an audit trail records what was said, not what would be
   said now.
+- **A subscription's price history is stored** (A2.1, ``Money Subscription Price``). This is the
+  same reason as the first, arriving in Part A: nothing in ``GL Entry`` distinguishes a price
+  rise from a month somebody forgot to pay. ``Money Subscription.amount`` is a *cache* of the
+  newest row, the relationship ``Money Account.current_balance`` has with the ledger — not a
+  second opinion about it.
 
 Everything personal — ratios, savings rate, cash flow, runway, allocation — **stays derived**.
 

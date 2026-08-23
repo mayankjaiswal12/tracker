@@ -217,22 +217,22 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; and Phase 3 (A1 in
-`docs/roadmap.rst`) has added tags, merchants, splits, transfer fees, reconciliation, receipts
-and bills. All of it is covered by **716 tests**
+Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; Phase 3 (A1 in
+`docs/roadmap.rst`) added tags, merchants, splits, transfer fees, reconciliation, receipts
+and bills; and A2.1 has added subscriptions. All of it is covered by **798 tests**
 (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
-| **16** | DocTypes, of which **2** are child tables — the first the app had |
+| **18** | DocTypes, of which **3** are child tables — the first arrived with A1 |
 | **5** | posting strategies implemented, of fourteen declared types |
-| **11** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills |
+| **13** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills, subscription spend, trials ending |
 | **5** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual, upcoming recurring |
 | **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
 | **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
-| **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES` |
-| **3** | daily scheduler jobs — recurring postings, budget alerts, bill reminders |
-| **11** | tracker-scoped DocTypes, each registered in *both* hook dicts |
+| **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES`, shared by plans and subscriptions |
+| **4** | daily scheduler jobs — recurring postings, budget alerts, bill reminders, subscription reminders |
+| **12** | tracker-scoped DocTypes, each registered in *both* hook dicts |
 | **38** | categories seeded for a new tracker, as a two-level tree |
 
 ### What A1 changed, and the rule it kept finding
@@ -262,6 +262,33 @@ keep the other's fields off it:
 And one invariant had to be restated rather than defended — see *Transfer* above: the movement
 is balance-sheet only, but a fee is expense, because the bank kept it.
 
+
+### What A2.1 changed: the one thing that cannot be derived
+
+`Money Subscription` is the first module here that is **neither a measurement nor a posting**.
+A goal, a budget and a card read the ledger; a plan writes to it. A subscription does neither —
+it records the terms of an arrangement, and the money either comes from the plan it links to or
+from somebody paying by hand. So it contains no strategy, no `generate()` and no Journal Entry.
+
+The boundary is the one `services/recurring.py` had already drawn: *a plan is the money and the
+calendar, and knows nothing about who is being paid or on what terms.* A subscription owns that
+other half — vendor, tier, trial end, notice period — and **links to** a plan rather than growing
+a second schedule. One plan pays one subscription, or its money is claimed twice.
+
+And it forced the app's first genuine exception to *derive, never store*:
+
+> **A price cannot be measured from the ledger.** Nothing in `GL Entry` distinguishes a price
+> rise from a month somebody forgot to pay — both look like a smaller number, or none at all. So
+> `Money Subscription Price` is the source of truth for price, and `amount` on the parent is a
+> cache of the newest row, exactly the relationship `Money Account.current_balance` has with the
+> ledger. Everything else about a subscription — the renewal date, the cancel-by date, the
+> monthly equivalent, the outcome word — is still derived on read.
+
+The cancel-by date is worth naming separately, because it is the only thing in this app a
+standing order cannot express: a plan has no counterparty to give notice to. It is also the
+reason `Subscription Spend` and `Fixed Costs` are allowed to overlap and are never summed — one
+is what leaves the account every month, the other is what you are signed up to, and a household
+cancels a subscription rather than a standing order.
 
 Goals, budgets and plans share one habit with `Money Account.current_balance`: **they store
 nothing they could derive**. A stored counter drifts the first time a transaction is

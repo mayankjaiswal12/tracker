@@ -513,6 +513,93 @@ DEMO_BILLS = (
 )
 
 
+# One subscription in every state worth looking at, because a subscription is nothing but its
+# state: a trial about to convert, a notice window closing, one somebody paused, one cancelled
+# that is still being paid for, and one whose price went up.
+#
+# Dated relative to today rather than to the demo's months, for the same reason the bills are:
+# a notice period that closed in April is not a warning about anything.
+#
+# **None of them names the plan that pays it, and that is deliberate.** The household's one
+# streaming standing order pays for Netflix *and* Spotify together, and a subscription claims a
+# whole plan — one plan pays one subscription, or its money is counted twice. Linking Netflix to
+# it would misstate what the plan pays for. Linking a plan by hand is part of the Desk pass.
+#
+# `amount` is the **opening** price; `prices` are the rises since, as (days from today, amount,
+# note). The controller keeps the two in step, so the seeder never writes the current price.
+DEMO_SUBSCRIPTIONS = (
+	{
+		"subscription_name": "Netflix",
+		"vendor": "Netflix",
+		"plan_name": "Premium",
+		"amount": 499,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -150,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"color": "#e50914",
+		"prices": ((-60, 649, "Price rise, June"),),
+		"notes": "The price went up in June. The history keeps what it used to cost.",
+	},
+	{
+		"subscription_name": "Adobe Photoshop",
+		"vendor": "Adobe",
+		"plan_name": "Photography, annual",
+		"amount": 12999,
+		"billing_frequency": "Yearly",
+		"category": "Subscriptions",
+		# Renews in a fortnight with ten days' notice needed, so the window is closing now.
+		# The one date only a subscription knows, and the reason this doctype exists.
+		"start_in_days": -350,
+		"notice_period_days": 10,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"color": "#31a8ff",
+		"notes": "Cancel by the date on the block above, or it renews for another year.",
+	},
+	{
+		"subscription_name": "Notion AI",
+		"vendor": "Notion",
+		"plan_name": "Plus",
+		"amount": 800,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -10,
+		"trial_in_days": 4,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"notes": "Free until the trial ends. The only state in this app where doing nothing costs money.",
+	},
+	{
+		"subscription_name": "Gym Membership",
+		"vendor": "Cult Fit",
+		"amount": 1500,
+		"billing_frequency": "Monthly",
+		"category": "Personal Care",
+		"start_in_days": -200,
+		"status": "Paused",
+		"account": "HDFC Bank",
+		"payment_method": "UPI",
+		"notes": "Paused, not cancelled — so it costs nothing and is still on the list.",
+	},
+	{
+		"subscription_name": "Cloud Storage",
+		"vendor": "Google",
+		"plan_name": "200 GB",
+		"amount": 199,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -400,
+		"status": "Cancelled",
+		"end_in_days": 40,
+		"account": "HDFC Credit Card",
+		"payment_method": "Credit Card",
+		"notes": "Cancelled, and paid for until the end date — so it is still in Subscription Spend.",
+	},
+)
+
+
 def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_NAME):
 	"""Create the demo tracker and post its transactions. Returns a summary dict.
 
@@ -574,6 +661,7 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 	_charge_a_transfer_fee(tracker, accounts, period)
 	_reconcile_the_oldest_month(tracker, period)
 	_create_bills(tracker, accounts, methods)
+	_create_subscriptions(tracker, accounts, methods)
 	_attach_a_receipt(tracker, posted_by_day)
 
 	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets, plans)
@@ -721,6 +809,49 @@ def _create_bills(tracker, accounts, methods):
 			}
 		)
 		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+	return created
+
+
+def _create_subscriptions(tracker, accounts, methods):
+	"""Five arrangements, one in each state a subscription can be in.
+
+	The price rises go in through `record_price` rather than by writing the parent's `amount`,
+	because the history is the source of truth and the field is a cache of the newest row — so
+	the seeder records what happened and lets `sync_price_history` work out what it costs now.
+	That is the same path the form takes, which is the point: a fixture that wrote the cache
+	directly would prove nothing about the rule.
+	"""
+	created = []
+	for row in DEMO_SUBSCRIPTIONS:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Subscription",
+				"tracker": tracker,
+				"subscription_name": row["subscription_name"],
+				"vendor": merchants_service.resolve(row.get("vendor"), tracker, create=True),
+				"plan_name": row.get("plan_name"),
+				"amount": row["amount"],
+				"billing_frequency": row["billing_frequency"],
+				"category": _category_named(tracker, row["category"]),
+				"account": accounts[row["account"]],
+				"payment_method": methods.get(row.get("payment_method")),
+				"start_date": add_days(today(), row["start_in_days"]),
+				"trial_end_date": add_days(today(), row["trial_in_days"]) if "trial_in_days" in row else None,
+				"end_date": add_days(today(), row["end_in_days"]) if "end_in_days" in row else None,
+				"notice_period_days": row.get("notice_period_days", 0),
+				"status": row.get("status", "Active"),
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+		if row.get("prices"):
+			for offset, amount, note in row["prices"]:
+				doc.record_price(amount, add_days(today(), offset), note)
+			doc.save(ignore_permissions=True)
+
 		created.append(doc.name)
 	return created
 
@@ -1198,6 +1329,7 @@ def clear_demo_data(tracker=None, tracker_name=None):
 	removed["budgets"] = _delete_all("Money Budget", {"tracker": tracker})
 	removed["recurring"] = _delete_all("Money Recurring Transaction", {"tracker": tracker})
 	removed["bills"] = _delete_all("Money Bill", {"tracker": tracker})
+	removed["subscriptions"] = _delete_all("Money Subscription", {"tracker": tracker})
 	removed["receipts"] = _delete_all("Money Receipt", {"tracker": tracker})
 	removed["tags"] = _delete_all("Money Tag", {"tracker": tracker})
 	removed["merchants"] = _delete_all("Money Merchant", {"tracker": tracker})

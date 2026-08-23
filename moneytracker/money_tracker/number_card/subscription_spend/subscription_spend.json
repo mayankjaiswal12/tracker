@@ -1,0 +1,19 @@
+{
+ "creation": "2026-08-23 10:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Money Subscription",
+ "filters_json": "{}",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Subscription Spend",
+ "method": "moneytracker.money_tracker.api.subscriptions.card_subscription_spend",
+ "modified": "2026-08-23 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Subscription Spend",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "type": "Custom"
+}

@@ -249,6 +249,23 @@ def backdate_plan(plan, creation):
 	return plan
 
 
+def make_subscription(tracker=None, **kwargs):
+	"""A subscription on `tracker`. A monthly 499 billed from today unless told otherwise.
+
+	`start_date` defaults to **today**, like `make_recurring` and unlike `make_budget`: every
+	renewal date is counted from the start date, so a fixture back-dated by a month would open
+	with its next renewal already behind it.
+	"""
+	kwargs.setdefault("subscription_name", unique("Subscription"))
+	kwargs.setdefault("amount", 499)
+	kwargs.setdefault("billing_frequency", "Monthly")
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Subscription", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_user(roles=("Finance User",)):
 	"""A user with only the restricted roles, so the permission hooks actually apply."""
 	email = f"mt-{frappe.generate_hash(length=8)}@example.com"
