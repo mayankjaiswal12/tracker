@@ -321,3 +321,76 @@ class TestShippedCardFixtures(MoneyTrackerTestCase):
 					frappe.db.exists("Number Card", card["name"]),
 					f"{card['name']} is missing — run `bench --site <site> migrate`",
 				)
+
+
+class TestCardRoutes(MoneyTrackerTestCase):
+	"""Clicking a card must land on the rows it counted.
+
+	Frappe routes a Custom card by reading a `route` off whatever its method returned, and these
+	methods return a **formatted string** on purpose (§33) — so there is nothing to route on, and
+	Frappe's own CSS still styles the card `cursor: pointer`. `public/js/card_routes.js` closes
+	that gap with one delegated listener and one table keyed on the card's label.
+
+	Which makes it wiring of exactly the kind the rest of this file guards: a table of strings in
+	a `.js` file that nothing imports and no build would complain about.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		app = frappe.get_app_path("moneytracker")
+		with open(os.path.join(app, "public", "js", "card_routes.js")) as f:
+			cls.routes_js = f.read()
+		cls.table = cls.routes_js.split("const CARD_ROUTES = {")[1].split("\n};")[0]
+
+	def routed_labels(self):
+		return set(re.findall(r'^\t"([^"]+)": \{', self.table, flags=re.MULTILINE))
+
+	def test_every_shipped_card_has_a_route(self):
+		"""A card with no entry is the defect this file exists to fix: it looks clickable,
+		because Frappe styles every number card that way, and does nothing."""
+		self.assertEqual(self.routed_labels(), {card["name"] for _folder, card in shipped_cards()})
+
+	def test_every_route_names_a_doctype_that_exists(self):
+		for doctype in set(re.findall(r'doctype: "([^"]+)"', self.table)):
+			with self.subTest(doctype=doctype):
+				self.assertTrue(frappe.db.exists("DocType", doctype))
+
+	def test_every_route_lands_on_a_tracker_scoped_list(self):
+		"""The destination has to be a list `permissions.py` filters, because the route carries
+		no tracker filter of its own — deliberately, since naming one here would be a second and
+		weaker copy of the app's only tenant isolation.
+
+		Note what is deliberately **not** asserted: that the route matches the card's own
+		`document_type`. That field is a permission gate — Number Card's hooks gate a Custom card
+		on it, so every card names something the reader can certainly read — and not a claim about
+		what the figure counts. `Total Balance` says `Transaction` for that reason while being
+		measured from account balances, and the accounts list is still where a click belongs.
+		"""
+		from moneytracker import hooks
+
+		scoped = set(hooks.permission_query_conditions)
+		for doctype in set(re.findall(r'doctype: "([^"]+)"', self.table)):
+			with self.subTest(doctype=doctype):
+				self.assertIn(doctype, scoped)
+
+	def test_the_bundle_is_wired_into_every_desk_page(self):
+		"""The table only runs if the bundle is loaded, and `app_include_js` is the only thing
+		that loads it."""
+		from moneytracker import hooks
+
+		self.assertEqual(hooks.app_include_js, "moneytracker.bundle.js")
+
+		bundle = frappe.get_app_path("moneytracker", "public", "js", "moneytracker.bundle.js")
+		with open(bundle) as f:
+			self.assertIn("card_routes.js", f.read())
+
+	def test_it_reads_the_label_the_workspace_block_writes(self):
+		"""`block.js` puts the card's label on the wrapper as `number_card_name`, and that label
+		is also the card's name — the widget-label rule in CLAUDE.md. Reading the rendered title
+		instead would break under translation."""
+		self.assertIn("number_card_name", self.routes_js)
+
+	def test_it_leaves_a_workspace_being_customised_alone(self):
+		"""In customize mode a click on a card is a drag, not a link."""
+		self.assertIn("edit-mode", self.routes_js)

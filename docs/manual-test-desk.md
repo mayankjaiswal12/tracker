@@ -252,6 +252,18 @@ you *more* money the more you charged to the card.
 ✅ Each figure carries the **tracker's** currency symbol, because the card renders the
 string server-side rather than handing the browser a bare number.
 
+✅ **Click every card.** Each one goes to the list its figure came from, with the filters it was
+measured with already applied: Total Balance and Net Worth → Money Account; Income and Expenses
+This Month → Transaction filtered to this month and that side (Expenses includes **Refund**,
+because the card nets refunds out); Savings Rate → this month's transactions, both sides; Goals /
+Budgets / Plans / Fixed Costs → their own Active lists; Bills Due → unpaid bills due within
+thirty days, Overdue Bills → unpaid and past their date; Subscription Spend → Money Subscription,
+Trials Ending → live trials. Frappe styles a number card `cursor: pointer` itself, so a card that
+does nothing when clicked means `public/js/card_routes.js` did not load — run `bench build --app
+moneytracker`. Two routes are deliberately unfiltered: Total Balance / Net Worth span every
+account, and Subscription Spend counts a cancelled subscription that is still being paid for and
+skips one in a trial, which no list filter can say.
+
 ### The charts
 
 Income vs Expense and Spending Trend are `Custom` charts fed by the `Money Period Totals`

@@ -28,7 +28,12 @@ required_apps = ["erpnext"]
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/moneytracker/css/moneytracker.css"
-# app_include_js = "/assets/moneytracker/js/moneytracker.js"
+#
+# Loaded on every Desk page for one reason: the workspace's Number Cards are all
+# `type: "Custom"` and return a formatted string, so Frappe has no `route` to follow when one is
+# clicked even though its own CSS styles them `cursor: pointer`. `public/js/card_routes.js`
+# holds the table of where each card's figure comes from and does the routing.
+app_include_js = "moneytracker.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/moneytracker/css/moneytracker.css"

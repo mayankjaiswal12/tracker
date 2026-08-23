@@ -219,7 +219,7 @@ moneytracker/patches/v1_0/
 
 Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; Phase 3 (A1 in
 `docs/roadmap.rst`) added tags, merchants, splits, transfer fees, reconciliation, receipts
-and bills; and A2.1 has added subscriptions. All of it is covered by **798 tests**
+and bills; and A2.1 has added subscriptions. All of it is covered by **804 tests**
 (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |

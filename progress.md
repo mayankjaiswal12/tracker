@@ -13,7 +13,7 @@ green *and* it has been looked at in Desk.
 | | |
 |---|---|
 | Branch | `feat/phase-a2-subscriptions`, off `feat/phase-3-a1-rest` |
-| Tests | **798 green**, ~97s |
+| Tests | **804 green**, ~100s |
 | Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`), reseeded 2026-08-23 |
 | Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1 complete** · **A2.1 subscriptions** |
 | **Blocking** | **The manual Desk pass — owed since Phase 1, deferred five times** |
@@ -282,6 +282,7 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-23 | **Number Cards are clickable.** All thirteen are `type: "Custom"` and return a formatted string, so Frappe had no `route` to follow while its own CSS styled them `cursor: pointer`. `public/js/card_routes.js` + `app_include_js`; 804 tests. |
 | 2026-08-23 | **A2.1 subscriptions shipped**; 798 tests. `Money Subscription` + `Money Subscription Price`, two cards, a Subscriptions workspace section, a daily reminder job, five demo subscriptions and `docs/manual-test-desk.md` §22. Demo household reseeded, so §7's demo figures moved. |
 | 2026-08-22 | **Docs brought up to date** — architecture.md, roadmap.rst (§0 verdicts + A1 marked built), task.md, CLAUDE.md, manual-test-desk.md. |
 | 2026-08-22 | **Desk gaps closed.** 11 cards, 21 shortcuts, Mark Paid + Reconcile dialogs, filtered pickers, demo seeds all of A1, manual-test-desk §17–§22. Fixed an orphaned-child-row bug in `clear_demo_data`. 716 tests. |
