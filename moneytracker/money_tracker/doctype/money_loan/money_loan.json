@@ -1,0 +1,292 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "LON-.#####",
+ "creation": "2026-08-23 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "status_section",
+  "progress_html",
+  "basics_section",
+  "loan_name",
+  "tracker",
+  "status",
+  "column_break_basics",
+  "direction",
+  "counterparty",
+  "color",
+  "terms_section",
+  "principal",
+  "currency",
+  "interest_rate",
+  "interest_type",
+  "column_break_terms",
+  "tenure_months",
+  "start_date",
+  "emi_override",
+  "emi",
+  "reminder_days_before",
+  "accounts_section",
+  "loan_account",
+  "column_break_accounts",
+  "interest_category",
+  "disbursal_transaction",
+  "schedule_section",
+  "schedule",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "status_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "progress_html",
+   "fieldtype": "HTML",
+   "label": "Loan"
+  },
+  {
+   "fieldname": "basics_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "loan_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Loan",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tracker",
+   "fieldtype": "Link",
+   "label": "Tracker",
+   "options": "Tracker",
+   "search_index": 1
+  },
+  {
+   "default": "Active",
+   "description": "Your own decision. Whether it is in arrears, due or paid off is worked out from the schedule and the ledger, so none of those is a choice here.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nClosed",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_basics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Borrowed",
+   "description": "Borrowed is money you owe, and its interest is expense. Lent is money owed to you, and its interest is income. Every sign in the posting follows from this one choice.",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Direction",
+   "options": "Borrowed\nLent",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Who lent it, or who you lent it to.",
+   "fieldname": "counterparty",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Counterparty",
+   "options": "Money Merchant"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "description": "These freeze once a payment has been posted against the loan. A loan is not renegotiated by editing a field \u2014 close it and open the new one.",
+   "fieldname": "terms_section",
+   "fieldtype": "Section Break",
+   "label": "Terms"
+  },
+  {
+   "description": "The amount borrowed or lent, before any interest.",
+   "fieldname": "principal",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Principal",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "0",
+   "description": "The nominal annual rate. Zero is allowed and means an interest-free loan.",
+   "fieldname": "interest_rate",
+   "fieldtype": "Percent",
+   "label": "Interest Rate (annual)"
+  },
+  {
+   "default": "Reducing Balance",
+   "description": "Reducing Balance charges interest on what is still outstanding \u2014 what a bank means by a home or car loan. Flat charges it on the original principal for the whole tenure, and is always dearer at the same nominal rate.",
+   "fieldname": "interest_type",
+   "fieldtype": "Select",
+   "label": "Interest Type",
+   "options": "Reducing Balance\nFlat",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_terms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Number of monthly instalments.",
+   "fieldname": "tenure_months",
+   "fieldtype": "Int",
+   "label": "Tenure (months)",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "description": "The day the money changed hands. Every instalment date is counted from here.",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Disbursed On",
+   "reqd": 1
+  },
+  {
+   "description": "The lender's own instalment figure, if it differs from the arithmetic. Their rounding is not ours, and the paper they sent is the truth. Leave blank and it is worked out from the terms.",
+   "fieldname": "emi_override",
+   "fieldtype": "Currency",
+   "label": "Instalment (as per lender)",
+   "options": "currency"
+  },
+  {
+   "description": "What each instalment comes to. Worked out from the terms, or taken from the figure above.",
+   "fieldname": "emi",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Instalment",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "reminder_days_before",
+   "fieldtype": "Int",
+   "label": "Call It Due (days before)"
+  },
+  {
+   "fieldname": "accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "description": "Where the outstanding balance lives. A liability for something borrowed, an asset for something lent \u2014 and it is the ledger, not this document, that says what is still owed.",
+   "fieldname": "loan_account",
+   "fieldtype": "Link",
+   "label": "Loan Account",
+   "options": "Money Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_accounts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Where the interest goes: an expense category for something borrowed, an income category for something lent. The principal is not spending \u2014 it is a balance coming down.",
+   "fieldname": "interest_category",
+   "fieldtype": "Link",
+   "label": "Interest Category",
+   "options": "Category",
+   "reqd": 1
+  },
+  {
+   "description": "The transfer that put the principal on the books. Created by Disburse \u2014 until it exists there is no debt to measure, because a loan account at zero looks exactly like one that has been paid off.",
+   "fieldname": "disbursal_transaction",
+   "fieldtype": "Link",
+   "label": "Disbursed By",
+   "no_copy": 1,
+   "options": "Transaction",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "schedule_section",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
+  },
+  {
+   "description": "Rebuilt from the terms on every save, until the first payment freezes them. The last instalment absorbs the rounding, so the closing balance is exactly zero.",
+   "fieldname": "schedule",
+   "fieldtype": "Table",
+   "label": "Schedule",
+   "options": "Money Loan Schedule",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-23 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Loan",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Finance Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
+ "sort_field": "loan_name",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "loan_name"
+}

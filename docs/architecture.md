@@ -219,21 +219,22 @@ moneytracker/patches/v1_0/
 
 Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; Phase 3 (A1 in
 `docs/roadmap.rst`) added tags, merchants, splits, transfer fees, reconciliation, receipts
-and bills; and A2.1 has added subscriptions. All of it is covered by **804 tests**
+and bills; and A2 has added subscriptions and loans. All of it is covered by **891 tests**
 (`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
-| **18** | DocTypes, of which **3** are child tables — the first arrived with A1 |
-| **5** | posting strategies implemented, of fourteen declared types |
-| **13** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills, subscription spend, trials ending |
+| **20** | DocTypes, of which **4** are child tables — the first arrived with A1 |
+| **6** | posting strategies implemented, of fourteen declared types — `Loan Payment` was the first of the nine planned ones to land |
+| **15** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills, subscription spend, trials ending, debt outstanding, loans in arrears |
 | **5** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual, upcoming recurring |
 | **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
 | **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
 | **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES`, shared by plans and subscriptions |
 | **4** | daily scheduler jobs — recurring postings, budget alerts, bill reminders, subscription reminders |
-| **12** | tracker-scoped DocTypes, each registered in *both* hook dicts |
-| **38** | categories seeded for a new tracker, as a two-level tree |
+| **13** | tracker-scoped DocTypes, each registered in *both* hook dicts |
+| **39** | categories seeded for a new tracker, as a two-level tree |
+| **3** | kinds of money attached to a category on a voucher that has none — split rows, fees, loan interest — each a row in `SIDE_CHARGES` |
 
 ### What A1 changed, and the rule it kept finding
 
@@ -289,6 +290,35 @@ standing order cannot express: a plan has no counterparty to give notice to. It 
 reason `Subscription Spend` and `Fixed Costs` are allowed to overlap and are never summed — one
 is what leaves the account every month, the other is what you are signed up to, and a household
 cancels a subscription rather than a standing order.
+
+### What A2.2 changed: one payment, two facts
+
+`Money Loan` exists for the sentence a Debt Payoff goal cannot say: **every instalment is part
+principal and part interest, and only one of those is spending.** The principal is a balance-sheet
+movement — the household is no poorer for having paid it, it simply owes less. The interest is the
+price of the money and is gone. Book the whole instalment as expense and expenses are overstated
+by the principal every month; book none of it and the entire cost of borrowing vanishes. So a
+`Loan Payment` posts three legs, and it is the first of the nine planned strategies to be built.
+
+`direction` is a field rather than a note because **both readings balance**. Money borrowed sits
+on a liability and its interest is expense; money lent sits on an asset and its interest is
+income. Reverse them and the entry still posts three balanced legs, while the Balance Sheet
+quietly reports that the household owns what it owes. Nothing downstream can catch that, so the
+loan's own controller checks the sides at Save and the strategy trusts it.
+
+Two smaller things are worth recording because both were found rather than designed:
+
+- **A loan has to be disbursed.** Until the principal is on the books the loan account sits at
+  zero — indistinguishable from a loan paid off — and repayments drive it negative. Disbursal
+  turned out to need no new strategy at all: it is a **Transfer**, a movement between two
+  balance-sheet accounts, which is exactly what borrowing is. `Not Disbursed` is a derived
+  outcome so the app says which of the two zero means.
+- **A transfer fee had never reached the spending trend.** Interest is charged to a category on a
+  voucher whose type is not a spending type, and so is a fee; teaching the aggregation about the
+  third case exposed that the second had only ever been half-taught. A fee was spending on the
+  category roll-up and in every budget, and not spending on "Expenses This Month" or the chart.
+  The two hand-written queries are now one table, `categories.SIDE_CHARGES`, with a window form
+  for the periods.
 
 Goals, budgets and plans share one habit with `Money Account.current_balance`: **they store
 nothing they could derive**. A stored counter drifts the first time a transaction is

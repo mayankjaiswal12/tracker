@@ -12,11 +12,11 @@ green *and* it has been looked at in Desk.
 
 | | |
 |---|---|
-| Branch | `feat/phase-a2-subscriptions`, off `feat/phase-3-a1-rest` |
-| Tests | **804 green**, ~100s |
-| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`), reseeded 2026-08-23 |
-| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1 complete** · **A2.1 subscriptions** |
-| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred five times** |
+| Branch | `feat/phase-a2-loans`, off `feat/phase-a2-subscriptions` |
+| Tests | **891 green**, ~111s |
+| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`), reseeded 2026-08-23 after A2.2 |
+| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1 complete** · **A2.1 subscriptions** · **A2.2 loans** |
+| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred seven times** |
 
 ### The one thing owed — now actually clickable
 
@@ -24,9 +24,9 @@ The manual Desk pass (`docs/manual-test-desk.md`). 716 automated tests say the a
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
-It gates all of A1 and now A2.1 as well. Nothing further should land on a Phase 1 nobody has
-looked at in a browser — `docs/manual-test-desk.md` is now §1–§15 plus §17–§22, with cleanup at
-§24, and every A1 and A2.1 figure in it was re-verified against the reseeded demo on 2026-08-23.
+It gates A1, A2.1 and now A2.2. Nothing further should land on a Phase 1 nobody has looked at in
+a browser — `docs/manual-test-desk.md` is now §1–§15 plus §17–§23, with cleanup at §25, and every
+A1, A2.1 and A2.2 figure in it was verified against the reseeded demo on 2026-08-23.
 
 ---
 
@@ -34,6 +34,8 @@ looked at in a browser — `docs/manual-test-desk.md` is now §1–§15 plus §1
 
 | Module | Date | Branch | Tests |
 |---|---|---|---|
+| `Money Loan` + the `Loan Payment` strategy — amortisation | 2026-08-23 | `feat/phase-a2-loans` | ✅ tests, Desk unseen |
+| Number Cards route on click | 2026-08-23 | `feat/phase-a2-subscriptions` | ✅ |
 | `Money Subscription` — the terms, where a plan holds only the money | 2026-08-23 | `feat/phase-a2-subscriptions` | ✅ tests, Desk unseen |
 | `Money Bill` — money owed, tracked until settled | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
 | `Money Receipt` — the paper behind a transaction | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
@@ -77,7 +79,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
 | A2.1 | `Money Subscription` | 🟡 | `feat/phase-a2-subscriptions` | Code + 82 tests green; **Desk unseen**. Terms only — it posts nothing. Price history is the one stored series in the app. *Subscriptions by Renewal* deferred to A3 with the rest of `report/` |
-| A2.2 | `Money Loan` + `Loan Payment` strategy | ⬜ | | Clears one of nine `PLANNED` types |
+| A2.2 | `Money Loan` + `Loan Payment` strategy | 🟡 | `feat/phase-a2-loans` | Code + 87 tests green; **Desk unseen**. `build_schedule` is pure. Cleared the **first** of the nine `PLANNED` types. Interest became the third `SIDE_CHARGES` row — and revealed that transfer fees had never reached the spending trend |
 | A2.3 | Budget completion | ⬜ | | Account-wise, custom range, templates |
 | A2.4 | Recurring completion | ⬜ | | Skip Next, custom interval, pre-reminder |
 | A2.5 | Saved views / calendar / global search | ⬜ | | Needs A1.1, A1.3 |
@@ -113,6 +115,49 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from A2.2 (loans)
+
+- **Every payment is two facts at once**, and that is the whole module. Principal is a balance
+  coming down and is not spending; interest is the price of the money and is the only part that
+  makes anybody poorer. Book the whole instalment as expense and the household looks poorer by
+  the principal every month; book none of it and the entire cost of borrowing disappears. A Debt
+  Payoff goal cannot say that, which is why it keeps the simple case and a loan owns amortisation.
+- **The app's one stored schedule, and the rule that makes it safe.** A schedule is a pure
+  function of the terms, so keeping a copy is normally the drift this codebase refuses — but the
+  terms **freeze** the moment a payment is posted. A copy of something that cannot change cannot
+  drift, and freezing is also right on its own: a loan is not renegotiated by editing a field.
+- **The last instalment absorbs the rounding.** A level EMI rounded to paise cannot clear the
+  principal exactly; repeating it leaves a residue owing forever. The check that it worked is one
+  line — the schedule's principal must come back as exactly the loan's.
+- **A loan has to be disbursed, and a test found that out.** With the principal not on the books
+  the loan account sits at zero, payments drive it *negative*, and `outstanding <= 0` read the
+  loan as `Closed` after its first instalment. Disbursal is a plain **Transfer** and needed no new
+  strategy — a movement between two balance-sheet accounts is exactly what it is — and
+  `Not Disbursed` is now a derived outcome, because zero is indistinguishable from paid off.
+- **`direction` is a field because both readings balance.** Borrowed sits on a liability with
+  expense interest; lent sits on an asset with income interest. Reversed, the entry still posts
+  three balanced legs and the Balance Sheet quietly says the household owns what it owes. So the
+  controller checks the sides at Save and the strategy trusts it.
+- **Arrears are counted, not matched date for date.** Somebody who clears March and April in one
+  afternoon is not behind. A schedule is not a set of individual claims the way bills are, which
+  is the one place a loan and a bill genuinely differ in how they are measured.
+- **`post_instalment` reads the interest off the schedule.** The agreement says what this month's
+  interest is; paying a round number does not change it. Which makes anything above the scheduled
+  instalment go to principal — exactly what a part-prepayment is, for free.
+- **The A1 aggregation lesson, applied before it could bite.** Interest is charged to a category
+  on a voucher whose type is not a spending type, so it was invisible to both `categories`
+  queries by construction. Rather than write a third hand-rolled query, the two became
+  `SIDE_CHARGES`, a table with one row per kind. **And that surfaced a live bug:** transfer fees
+  had never reached `trends.get_period_series`, so a fee was spending on the category roll-up and
+  on every budget but *not* on "Expenses This Month" or the spending chart — the same money
+  reading two ways on one screen. `get_side_charges_by_date` closes it, and the demo's
+  Expenses This Month moved by exactly the ₹50 fee.
+- **`Interest Paid` was added to `DEFAULT_CATEGORIES`** (39 now, was 38). A loan requires an
+  interest category, and the alternative was every household filing interest under Bank Charges,
+  where it stops being separable from a 50-rupee transfer fee.
 
 ---
 
@@ -282,6 +327,7 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-23 | **A2.2 loans shipped**; 891 tests. `Money Loan` + `Money Loan Schedule`, a pure `build_schedule`, the **Loan Payment strategy** (first of nine planned types cleared), Disburse / Post Instalment / Close actions, two cards, a Loans workspace section, two demo loans and `docs/manual-test-desk.md` §23. Found and fixed a real bug on the way: transfer fees had never reached the spending trend. |
 | 2026-08-23 | **Number Cards are clickable.** All thirteen are `type: "Custom"` and return a formatted string, so Frappe had no `route` to follow while its own CSS styled them `cursor: pointer`. `public/js/card_routes.js` + `app_include_js`; 804 tests. |
 | 2026-08-23 | **A2.1 subscriptions shipped**; 798 tests. `Money Subscription` + `Money Subscription Price`, two cards, a Subscriptions workspace section, a daily reminder job, five demo subscriptions and `docs/manual-test-desk.md` §22. Demo household reseeded, so §7's demo figures moved. |
 | 2026-08-22 | **Docs brought up to date** — architecture.md, roadmap.rst (§0 verdicts + A1 marked built), task.md, CLAUDE.md, manual-test-desk.md. |

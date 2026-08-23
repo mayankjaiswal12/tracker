@@ -81,6 +81,14 @@ const CARD_ROUTES = {
 			trial_end_date: [">=", frappe.datetime.get_today()],
 		}),
 	},
+
+	// Borrowed only, because that is what the figure counts — money lent out is an asset and
+	// adding the two would answer no question.
+	"Debt Outstanding": {
+		doctype: "Money Loan",
+		filters: { status: "Active", direction: "Borrowed" },
+	},
+	"Loans in Arrears": { doctype: "Money Loan", filters: { status: "Active" } },
 };
 
 moneytracker.cards.routes = CARD_ROUTES;

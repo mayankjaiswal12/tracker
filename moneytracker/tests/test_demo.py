@@ -19,7 +19,7 @@ from frappe.utils import get_first_day, getdate, today
 
 from moneytracker.money_tracker import demo
 from moneytracker.money_tracker.posting import strategies
-from moneytracker.money_tracker.services import coa, goals, subscriptions
+from moneytracker.money_tracker.services import coa, goals, loans, subscriptions
 from moneytracker.money_tracker.services.categories import DEFAULT_CATEGORIES
 from moneytracker.tests.utils import MoneyTrackerTestCase, unique
 
@@ -296,6 +296,52 @@ class TestDemoSubscriptions(MoneyTrackerTestCase):
 					self.assertGreater(offset, row["start_in_days"])
 
 
+class TestDemoLoans(MoneyTrackerTestCase):
+	"""The loan plan as data. Both directions, because `direction` is the field every sign in a
+	loan posting follows from and a demo with only one side proves nothing about it."""
+
+	def test_every_loan_names_an_account_the_demo_creates(self):
+		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["loan_account"], created)
+				self.assertIn(row["account"], created)
+
+	def test_the_loan_account_is_on_the_side_the_direction_implies(self):
+		"""Both readings balance, so nothing downstream would catch it — the Balance Sheet would
+		simply say the household owns what it owes."""
+		for row in demo.DEMO_LOANS:
+			account_type = ACCOUNT_TYPES[row["loan_account"]]
+			with self.subTest(loan=row["loan_name"]):
+				self.assertEqual(coa.is_liability(account_type), row["direction"] == loans.BORROWED)
+
+	def test_the_interest_category_is_on_the_side_the_direction_implies(self):
+		leaves = seeded_categories()
+		for row in demo.DEMO_LOANS:
+			side = "Expense" if row["direction"] == loans.BORROWED else "Income"
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["interest_category"], leaves[side])
+
+	def test_the_plan_shows_both_directions(self):
+		self.assertEqual({row["direction"] for row in demo.DEMO_LOANS}, set(loans.DIRECTIONS))
+
+	def test_every_interest_type_is_one_the_table_knows(self):
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["interest_type"], loans.INTEREST_TYPES)
+
+	def test_one_loan_is_deliberately_behind(self):
+		"""The only way to see the arrears state, or the card reading anything but zero."""
+		self.assertTrue(any(row["unpaid"] for row in demo.DEMO_LOANS))
+
+	def test_no_loan_is_disbursed_outside_the_demos_own_months(self):
+		"""A disbursal is a real posting, and ERPNext refuses one outside a Fiscal Year."""
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertGreaterEqual(row["start_month"], 0)
+				self.assertLess(row["start_month"], demo.DEFAULT_MONTHS)
+
+
 class TestDemoRefusals(MoneyTrackerTestCase):
 	def test_it_refuses_to_run_during_a_test(self):
 		"""Without the opt-in. Demo data in a suite run would skew every total in it."""
@@ -346,6 +392,8 @@ class TestDemoRoundTrip(MoneyTrackerTestCase):
 				# its rows — unlike `Transaction`, which goes by raw table delete and needs
 				# `TRANSACTION_CHILD_TABLES` for exactly that reason.
 				"Money Subscription Price",
+				"Money Loan",
+				"Money Loan Schedule",
 			)
 		}
 

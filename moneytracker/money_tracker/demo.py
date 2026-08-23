@@ -37,6 +37,7 @@ from frappe.utils import (
 from moneytracker.money_tracker.services import balances
 from moneytracker.money_tracker.services import budgets as budgets_service
 from moneytracker.money_tracker.services import goals as goals_service
+from moneytracker.money_tracker.services import loans as loans_service
 from moneytracker.money_tracker.services import merchants as merchants_service
 from moneytracker.money_tracker.services import recurring as recurring_service
 from moneytracker.money_tracker.services import settings as settings_service
@@ -58,6 +59,7 @@ ACCOUNT_GROUPS = (
 	("Banks", "Asset"),
 	("Cards", "Liability"),
 	("Cash", "Asset"),
+	("Loans", "Liability"),
 )
 
 # (method_name, applies_to_account_type) — also site-wide.
@@ -74,6 +76,11 @@ DEMO_ACCOUNTS = (
 	("Emergency Fund", "Savings", "Banks", "HDFC Bank"),
 	("HDFC Credit Card", "Credit Card", "Cards", "HDFC Bank"),
 	("Wallet", "Cash", "Cash", None),
+	# Where a loan's outstanding principal lives. A liability for money borrowed, and an
+	# ordinary asset for money lent — `Money Loan` refuses either the wrong way round, because
+	# both readings balance and only one of them is true.
+	("Personal Loan", "Loan", "Loans", "HDFC Bank"),
+	("Loan to Ravi", "Other Asset", None, None),
 )
 
 # One month of a salaried household, in day order. Accounts and categories are named, not
@@ -600,6 +607,52 @@ DEMO_SUBSCRIPTIONS = (
 )
 
 
+# One loan each way, because `direction` is the field every sign in a loan posting follows from
+# and a demo with only one side proves nothing about it.
+#
+# `start_month` indexes the demo's months, so both loans are disbursed inside a period the
+# Fiscal Year covers — a disbursal is a real posting and ERPNext refuses one outside a year.
+# `unpaid` leaves that many elapsed instalments unposted, which is the only way to see the
+# arrears state and the `Loans in Arrears` card reading anything but zero.
+DEMO_LOANS = (
+	{
+		# A *personal* loan on purpose, not a car loan: a personal loan is disbursed into your
+		# bank account, which is something this app can model today. A car loan is disbursed to
+		# the dealer and what you get is the car — an asset, and `Money Asset` is A4.2. Seeding
+		# one would have shown five lakh of imaginary cash sitting in the current account.
+		"loan_name": "Personal Loan",
+		"direction": "Borrowed",
+		"principal": 200000,
+		"interest_rate": 12,
+		"interest_type": "Reducing Balance",
+		"tenure_months": 24,
+		"loan_account": "Personal Loan",
+		"interest_category": "Interest Paid",
+		"counterparty": "HDFC Bank",
+		"account": "HDFC Bank",
+		"start_month": 0,
+		"unpaid": 1,
+		"color": "#c0392b",
+		"notes": "Two years at 12% reducing. One instalment behind on purpose — the schedule shows which.",
+	},
+	{
+		"loan_name": "Loan to Ravi",
+		"direction": "Lent",
+		"principal": 50000,
+		"interest_rate": 0,
+		"interest_type": "Reducing Balance",
+		"tenure_months": 10,
+		"loan_account": "Loan to Ravi",
+		"interest_category": "Other Income",
+		"counterparty": "Ravi",
+		"account": "HDFC Bank",
+		"start_month": 1,
+		"unpaid": 0,
+		"notes": "Interest-free, and money owed *to* the household — so it is an asset, not a debt.",
+	},
+)
+
+
 def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_NAME):
 	"""Create the demo tracker and post its transactions. Returns a summary dict.
 
@@ -662,6 +715,7 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 	_reconcile_the_oldest_month(tracker, period)
 	_create_bills(tracker, accounts, methods)
 	_create_subscriptions(tracker, accounts, methods)
+	_create_loans(tracker, accounts, period)
 	_attach_a_receipt(tracker, posted_by_day)
 
 	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets, plans)
@@ -809,6 +863,58 @@ def _create_bills(tracker, accounts, methods):
 			}
 		)
 		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+	return created
+
+
+def _create_loans(tracker, accounts, period):
+	"""Two loans, disbursed and part repaid, one of them a month behind.
+
+	The instalments go in through `post_instalment` rather than by writing transactions
+	directly, so the demo takes exactly the path the form takes — and so a demo that seeded a
+	wrong principal-and-interest split would be a demo that could not have been produced by
+	clicking the button.
+	"""
+	created = []
+	for row in DEMO_LOANS:
+		# Clamped, because the number of months is an argument: `setup_demo_data(months=1)` has
+		# only one to index into, and a loan disbursed outside the demo's own window would be a
+		# posting outside a Fiscal Year.
+		start = getdate(period[min(row["start_month"], len(period) - 1)])
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Loan",
+				"tracker": tracker,
+				"loan_name": row["loan_name"],
+				"direction": row["direction"],
+				"principal": row["principal"],
+				"interest_rate": row["interest_rate"],
+				"interest_type": row["interest_type"],
+				"tenure_months": row["tenure_months"],
+				"start_date": start,
+				"loan_account": accounts[row["loan_account"]],
+				"interest_category": _category_named(tracker, row["interest_category"]),
+				"counterparty": merchants_service.resolve(row.get("counterparty"), tracker, create=True),
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		doc.disburse(account=accounts[row["account"]], on_date=start)
+		doc.reload()
+
+		# Every instalment whose date has passed, less the ones deliberately left behind. Each
+		# is posted on its own due date, so the schedule and the ledger tell the same story.
+		due = [
+			instalment
+			for instalment in loans_service.schedule_rows(doc)
+			if instalment.due_date <= getdate(today())
+		]
+		for instalment in due[: max(len(due) - int(row["unpaid"]), 0)]:
+			if not _covered_by_a_fiscal_year(instalment.due_date):
+				continue
+			doc.post_instalment(from_account=accounts[row["account"]], paid_on=instalment.due_date)
+
 		created.append(doc.name)
 	return created
 
@@ -1330,6 +1436,7 @@ def clear_demo_data(tracker=None, tracker_name=None):
 	removed["recurring"] = _delete_all("Money Recurring Transaction", {"tracker": tracker})
 	removed["bills"] = _delete_all("Money Bill", {"tracker": tracker})
 	removed["subscriptions"] = _delete_all("Money Subscription", {"tracker": tracker})
+	removed["loans"] = _delete_all("Money Loan", {"tracker": tracker})
 	removed["receipts"] = _delete_all("Money Receipt", {"tracker": tracker})
 	removed["tags"] = _delete_all("Money Tag", {"tracker": tracker})
 	removed["merchants"] = _delete_all("Money Merchant", {"tracker": tracker})

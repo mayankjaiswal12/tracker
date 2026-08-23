@@ -266,6 +266,30 @@ def make_subscription(tracker=None, **kwargs):
 	return doc
 
 
+def make_loan(tracker=None, **kwargs):
+	"""A loan on `tracker`. 100,000 borrowed at 12% over 12 monthly instalments.
+
+	`loan_account` and `interest_category` are required and have to be on the side the
+	direction implies — a liability and an expense category for something borrowed — so a
+	caller passes them rather than having them guessed at.
+
+	`start_date` defaults to **today**, so instalment one falls due next month and a fresh
+	fixture is `On Schedule` rather than already behind. A test that wants arrears moves the
+	start date back instead.
+	"""
+	kwargs.setdefault("loan_name", unique("Loan"))
+	kwargs.setdefault("direction", "Borrowed")
+	kwargs.setdefault("principal", 100000)
+	kwargs.setdefault("interest_rate", 12)
+	kwargs.setdefault("interest_type", "Reducing Balance")
+	kwargs.setdefault("tenure_months", 12)
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Loan", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_user(roles=("Finance User",)):
 	"""A user with only the restricted roles, so the permission hooks actually apply."""
 	email = f"mt-{frappe.generate_hash(length=8)}@example.com"

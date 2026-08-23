@@ -1,0 +1,42 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-23 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "instalment",
+  "due_date",
+  "opening_balance",
+  "payment",
+  "principal",
+  "interest",
+  "closing_balance"
+ ],
+ "fields": [
+  {"columns": 1, "fieldname": "instalment", "fieldtype": "Int", "in_list_view": 1, "label": "#", "read_only": 1},
+  {"columns": 2, "fieldname": "due_date", "fieldtype": "Date", "in_list_view": 1, "label": "Due", "read_only": 1},
+  {"fieldname": "opening_balance", "fieldtype": "Currency", "label": "Opening", "read_only": 1},
+  {"columns": 2, "description": "What leaves the account. Principal and interest always add up to it.",
+   "fieldname": "payment", "fieldtype": "Currency", "in_list_view": 1, "label": "Payment", "read_only": 1},
+  {"columns": 2, "fieldname": "principal", "fieldtype": "Currency", "in_list_view": 1, "label": "Principal", "read_only": 1},
+  {"columns": 2, "fieldname": "interest", "fieldtype": "Currency", "in_list_view": 1, "label": "Interest", "read_only": 1},
+  {"columns": 2, "fieldname": "closing_balance", "fieldtype": "Currency", "in_list_view": 1, "label": "Closing", "read_only": 1}
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Money Loan Schedule",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "instalment",
+ "sort_order": "ASC",
+ "states": []
+}

@@ -1,10 +1,10 @@
 # Manual test run — Desk
 
 A click-through pass over everything Phase 1 implements, plus the three features that opened
-Phase 2 — goals (§13), budgets (§14) and recurring transactions (§15) — plus A1 (§17–§21) and
-A2.1 subscriptions (§22). Every number below is pre-computed and was verified against the
-ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13, 2026-08-19 for §14, 2026-08-20 for §15,
-2026-08-23 for §17–§22 — so you are checking arithmetic, not recomputing it.
+Phase 2 — goals (§13), budgets (§14) and recurring transactions (§15) — plus A1 (§17–§21), A2.1
+subscriptions (§22) and A2.2 loans (§23). Every number below is pre-computed and was verified
+against the ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13, 2026-08-19 for §14, 2026-08-20
+for §15, 2026-08-23 for §17–§23 — so you are checking arithmetic, not recomputing it.
 
 Roughly an hour. Nothing here needs the terminal except the alert job in §14, the nightly
 job in §15, and two optional cross-checks.
@@ -41,10 +41,11 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 ### Existing data
 
 Tracker **Demo Household** and its four accounts are the demo data
-(`money_tracker/demo.py`), **reseeded 2026-08-23**: 72 transactions over five months, seven
-goals, five budgets, five standing orders, seventeen merchants, three tags, three bills, two
-receipts and **five subscriptions** — plus one split grocery run, one transfer carrying a fee,
-and the first month already reconciled. That is what the workspace cards and charts show.
+(`money_tracker/demo.py`), **reseeded 2026-08-23 after A2.2**: 80 transactions over five months
+across **six** accounts, seven goals, five budgets, five standing orders, sixteen merchants, three
+tags, three bills, two receipts, **five subscriptions** and **two loans** — plus one split grocery
+run, one transfer carrying a fee, and the first month already reconciled. That is what the
+workspace cards and charts show.
 
 **Ignore it for §1–§15** — those create their own `DT *` set so the numbers stay clean — except
 §7, where the point is that the widgets read a populated tracker. **§17–§22 run entirely on the
@@ -258,7 +259,8 @@ This Month → Transaction filtered to this month and that side (Expenses includ
 because the card nets refunds out); Savings Rate → this month's transactions, both sides; Goals /
 Budgets / Plans / Fixed Costs → their own Active lists; Bills Due → unpaid bills due within
 thirty days, Overdue Bills → unpaid and past their date; Subscription Spend → Money Subscription,
-Trials Ending → live trials. Frappe styles a number card `cursor: pointer` itself, so a card that
+Trials Ending → live trials; Debt Outstanding → borrowed loans, Loans in Arrears → active loans.
+Frappe styles a number card `cursor: pointer` itself, so a card that
 does nothing when clicked means `public/js/card_routes.js` did not load — run `bench build --app
 moneytracker`. Two routes are deliberately unfiltered: Total Balance / Net Worth span every
 account, and Subscription Spend counts a cancelled subscription that is still being paid for and
@@ -881,7 +883,7 @@ Income **1,20,000** and Expense **39,699** for every month after this one.
 
 ## 17. Tags — the same money read a second way
 
-Everything in §17–§22 is on the **demo household**, which now seeds all of it. Nothing needs
+Everything in §17–§23 is on the **demo household**, which now seeds all of it. Nothing needs
 creating first.
 
 Open **Money Tag** from the workspace (Quick Actions). Three: `Family`, `Essentials`, `Treats`.
@@ -1026,7 +1028,70 @@ you are signed up to. A household cancels a subscription, not a standing order.
 alongside the subscriptions. `Netflix` and `Netflix, Spotify` both exist, which is the honest
 picture: the second came from the old free-text field and the first was typed as a vendor.
 
-## 23. What is deliberately not wired
+## 23. Loans — one payment, two facts
+
+Two are seeded, one each way, because `direction` is what every sign in a loan posting follows
+from. Open **Money Loan** from Quick Actions.
+
+| Loan | Terms | Expect |
+|---|---|---|
+| Personal Loan | ₹2,00,000 borrowed, 12% reducing, 24 months | **In Arrears** — one instalment behind on purpose |
+| Loan to Ravi | ₹50,000 lent, interest-free, 10 months | **On Schedule** |
+
+1. Open **Personal Loan**. The block shows what is still owed — **₹1,77,532.74** — a progress
+   bar, and the footnotes: *3 of 24 instalments paid*, *1 behind*, and **₹25,952.70 interest over
+   the tenure**. That last figure is the one a schedule exists to show.
+2. Expand **Schedule**. Twenty-four rows, every one of them read-only. Check three things by eye:
+   each row's principal + interest = its payment; the **interest falls** month by month (that is
+   what "reducing balance" means); and the **last row's closing balance is exactly 0.00**. A
+   level instalment rounded to paise cannot clear the principal, so the final row absorbs the
+   difference — if it reads 0.01 or −0.03, that is a real finding.
+3. The **Instalment** field is read-only and reads **₹9,414.69**. It is worked out from the terms.
+   Put 9,500 in *Instalment (as per lender)* and save: the whole table rebuilds around the new
+   figure and still closes at zero. Take it out again.
+4. **Try to change a term.** Set the rate to 18% and save. It should refuse — three payments have
+   been posted, so the terms are frozen. This is the rule that makes a *stored* schedule safe: a
+   loan is not renegotiated by editing a field. Now change **Notes** and save: fine. Freezing the
+   terms must not freeze the document.
+5. Press **Post Instalment**. The amount pre-fills to the instalment; confirm. It posts a
+   **Loan Payment** and the alert names the split. Open the transaction: it has **no category**,
+   an **Interest** figure, and a linked Journal Entry with **three** lines — the loan account
+   debited by the principal, `Interest Paid` debited by the interest, the bank credited the whole
+   payment. The loan should now read **On Schedule**.
+6. Press **Post Instalment** again with an amount of **20,000**. The interest stays at the
+   scheduled figure and everything above it goes to principal — which is exactly what a
+   part-prepayment is. The agreement says what this month's interest is; paying a round number
+   does not change it.
+7. Open **Loan to Ravi**. Money owed *to* the household, so it sits on an **asset** account and
+   its interest category is an **income** one. Its Journal Entries are the mirror image: the bank
+   debited, the loan account credited.
+8. **Check the interest reaches spending.** `Interest Paid` should appear in the Expense category
+   roll-up with the interest paid so far, and **not** with the principal — the principal is a
+   balance coming down, not money spent. This is the same rule a transfer fee follows (§19), and
+   the reason both live in one table.
+9. Make a new loan and try the refusals: a bank account as the loan account for something
+   borrowed (it must be a liability), an income category for interest on borrowed money, a tenure
+   of 0, a principal of 0, a lender's instalment of ₹500 on a two-lakh loan (it does not even
+   cover the first month's interest, so the loan would never be repaid).
+10. On the new loan, press **Post Instalment** before disbursing. Refused: until the principal is
+    on the books there is nothing to repay, and the block reads **Not Disbursed**. Press
+    **Disburse**, pick an account, and watch a plain **Transfer** appear — nobody is richer or
+    poorer for having borrowed, so it touches neither income nor expense.
+11. Press **Close Loan** on it while the balance is still outstanding: refused. A loan reading
+    closed over a live balance would understate every debt figure in the app.
+12. On the workspace, the **Loans** section shows **Debt Outstanding ₹1,77,532.74** and
+    **Loans in Arrears 1 behind**. Click each: the first goes to the borrowed loans, the second
+    to the active ones.
+
+✅ **The key check:** Debt Outstanding counts **borrowed** loans only. `Loan to Ravi` is money the
+household is owed — an asset — and netting the two would give a figure that answers no question.
+It is the same reasoning that keeps credit-card debt out of Total Balance.
+
+✅ Note that **Total Balance is much larger than it was in §7's demo figures** and Net Worth is
+about the same. That is correct and is the point: the household really did borrow ₹2,00,000, and
+it really does owe it.
+
+## 24. What is deliberately not wired
 
 Not defects; scope not yet reached. Do not raise these as bugs.
 
@@ -1036,20 +1101,25 @@ Not defects; scope not yet reached. Do not raise these as bugs.
   still the only ones, under Ledger & Reports. *Subscriptions by Renewal* is named in the A2.1
   spec and is deliberately not built: `services/subscriptions.get_renewals` already returns the
   figure, and the report is A3 along with the rest of `report/`.
-- No **subscription chart** on the workspace, for the same reason as the tag and merchant ones.
+- No **subscription or loan chart** on the workspace, for the same reason as the tag and merchant
+  ones. An amortisation chart is a natural A3 addition; `api/loans.get_schedule` already returns
+  the series.
+- No **asset** behind a loan. A car loan is disbursed to the dealer and what you get is the car,
+  and `Money Asset` is A4.2 — which is why the demo seeds a *personal* loan, the kind that really
+  does land in your bank account.
 - The **receipt inbox** has no screen of its own; `api/receipts.get_unattached` returns it, but
   you reach unattached receipts through the Money Receipt list.
 - Split and fee category pickers are filtered to expense leaves, but the **grid does not show a
   running total** of the split rows against the amount.
 
-## 24. Cleanup (optional)
+## 25. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
 2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14, the `DT *`
-   plans from §15 and any `DT *` bills, tags, merchants, receipts or subscriptions from
-   §17–§22 — none is
+   plans from §15 and any `DT *` bills, tags, merchants, receipts, subscriptions or loans from
+   §17–§23 — none is
    submittable, so they just delete. Deleting a plan leaves the
    transactions it posted behind, with the link cleared; cancel and delete those with the rest.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
@@ -1091,6 +1161,9 @@ Two things deliberately survive and are safe to leave:
   day. Both are covered by the automated suite, along with the `Notice Passed` outcome, which
   the demo deliberately does not seed: it is a fact nobody can act on, so it is not worth a
   click-through.
+- A **flat-interest** loan, and a loan billed anything other than monthly — §23 is reducing
+  balance and monthly throughout. Both are covered by the automated suite, along with the
+  interest-only instalment and the single bullet repayment.
 - A budget measured **while its period is still running**. §14 clamps every envelope to a
   closed August on purpose, so its figures read the same whenever you run it; the demo
   household's five budgets are the live case, and their pace markers sit mid-bar.
