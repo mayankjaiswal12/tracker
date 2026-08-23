@@ -163,6 +163,28 @@ def make_payment_method(**kwargs):
 	return doc
 
 
+def make_bill(tracker=None, **kwargs):
+	"""A bill on `tracker`. Unpaid, due today, 1,000 unless told otherwise."""
+	kwargs.setdefault("bill_name", unique("Bill"))
+	kwargs.setdefault("amount", 1000)
+	kwargs.setdefault("due_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Bill", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_receipt(tracker=None, **kwargs):
+	"""A receipt on `tracker`. Carries an image unless told otherwise, since a receipt with
+	neither a file nor an image is refused."""
+	kwargs.setdefault("image", f"/files/{unique('receipt')}.png")
+	kwargs.setdefault("title", unique("Receipt"))
+
+	doc = frappe.get_doc({"doctype": "Money Receipt", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
 def make_merchant(tracker=None, **kwargs):
 	"""A merchant on `tracker`. Names are minted unique because they are unique per tracker."""
 	kwargs.setdefault("merchant_name", unique("Merchant"))
@@ -225,6 +247,47 @@ def backdate_plan(plan, creation):
 	frappe.db.set_value("Money Recurring Transaction", plan.name, "creation", creation, update_modified=False)
 	plan.reload()
 	return plan
+
+
+def make_subscription(tracker=None, **kwargs):
+	"""A subscription on `tracker`. A monthly 499 billed from today unless told otherwise.
+
+	`start_date` defaults to **today**, like `make_recurring` and unlike `make_budget`: every
+	renewal date is counted from the start date, so a fixture back-dated by a month would open
+	with its next renewal already behind it.
+	"""
+	kwargs.setdefault("subscription_name", unique("Subscription"))
+	kwargs.setdefault("amount", 499)
+	kwargs.setdefault("billing_frequency", "Monthly")
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Subscription", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_loan(tracker=None, **kwargs):
+	"""A loan on `tracker`. 100,000 borrowed at 12% over 12 monthly instalments.
+
+	`loan_account` and `interest_category` are required and have to be on the side the
+	direction implies — a liability and an expense category for something borrowed — so a
+	caller passes them rather than having them guessed at.
+
+	`start_date` defaults to **today**, so instalment one falls due next month and a fresh
+	fixture is `On Schedule` rather than already behind. A test that wants arrears moves the
+	start date back instead.
+	"""
+	kwargs.setdefault("loan_name", unique("Loan"))
+	kwargs.setdefault("direction", "Borrowed")
+	kwargs.setdefault("principal", 100000)
+	kwargs.setdefault("interest_rate", 12)
+	kwargs.setdefault("interest_type", "Reducing Balance")
+	kwargs.setdefault("tenure_months", 12)
+	kwargs.setdefault("start_date", posting_date())
+
+	doc = frappe.get_doc({"doctype": "Money Loan", "tracker": tracker, **kwargs})
+	doc.insert(ignore_permissions=True)
+	return doc
 
 
 def make_user(roles=("Finance User",)):

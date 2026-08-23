@@ -1,11 +1,12 @@
 # Manual test run — Desk
 
 A click-through pass over everything Phase 1 implements, plus the three features that opened
-Phase 2: goals (§13), budgets (§14) and recurring transactions (§15). Every number below is
-pre-computed and was verified against the ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13,
-2026-08-19 for §14, 2026-08-20 for §15 — so you are checking arithmetic, not recomputing it.
+Phase 2 — goals (§13), budgets (§14) and recurring transactions (§15) — plus A1 (§17–§21), A2.1
+subscriptions (§22) and A2.2 loans (§23). Every number below is pre-computed and was verified
+against the ledger — 2026-08-16 for §1–§12, 2026-08-17 for §13, 2026-08-19 for §14, 2026-08-20
+for §15, 2026-08-23 for §17–§23 — so you are checking arithmetic, not recomputing it.
 
-Roughly 45 minutes. Nothing here needs the terminal except the alert job in §14, the nightly
+Roughly an hour. Nothing here needs the terminal except the alert job in §14, the nightly
 job in §15, and two optional cross-checks.
 
 ---
@@ -39,12 +40,24 @@ docker exec -d -w /workspace/development/frappe-bench frappe_bench2-frappe-1 \
 
 ### Existing data
 
-Tracker **Demo Household** and its four accounts are the demo data
-(`money_tracker/demo.py`), seeded 2026-08-16: 67 transactions over 2026-04-01 … 2026-08-15,
-seven goals added 2026-08-17, **five budgets added 2026-08-19** and **five standing orders
-added 2026-08-20**, which is what the workspace cards and charts show. Ignore it for the posting steps — this
-run creates its own `DT *` set so the numbers stay clean — and use it in §7, where the point
-is that the widgets read a populated tracker.
+Tracker **Demo Household** and its six accounts are the demo data
+(`money_tracker/demo.py`), **reseeded 2026-08-23 after A2.2**: 80 transactions over five months
+across **six** accounts, seven goals, five budgets, five standing orders, sixteen merchants, three
+tags, three bills, two receipts, **five subscriptions** and **two loans** — plus one split grocery
+run, one transfer carrying a fee, and the first month already reconciled. That is what the
+workspace cards and charts show.
+
+**Ignore it for §1–§15** — those create their own `DT *` set so the numbers stay clean — except
+§7, where the point is that the widgets read a populated tracker. **§17–§22 run entirely on the
+demo household and need nothing created.**
+
+If the figures below do not match, reseed:
+
+```bash
+docker exec -w /workspace/development/frappe-bench frappe_bench2-frappe-1 bash -lc \
+  'bench --site tracker.localhost execute moneytracker.money_tracker.demo.clear_demo_data && \
+   bench --site tracker.localhost execute moneytracker.money_tracker.demo.setup_demo_data'
+```
 
 The old `Verify Ledger` / `VL *` data this document used to mention was deleted on
 2026-08-16, along with the user `vl.other@example.com`; the demo replaced it.
@@ -239,6 +252,19 @@ you *more* money the more you charged to the card.
 
 ✅ Each figure carries the **tracker's** currency symbol, because the card renders the
 string server-side rather than handing the browser a bare number.
+
+✅ **Click every card.** Each one goes to the list its figure came from, with the filters it was
+measured with already applied: Total Balance and Net Worth → Money Account; Income and Expenses
+This Month → Transaction filtered to this month and that side (Expenses includes **Refund**,
+because the card nets refunds out); Savings Rate → this month's transactions, both sides; Goals /
+Budgets / Plans / Fixed Costs → their own Active lists; Bills Due → unpaid bills due within
+thirty days, Overdue Bills → unpaid and past their date; Subscription Spend → Money Subscription,
+Trials Ending → live trials; Debt Outstanding → borrowed loans, Loans in Arrears → active loans.
+Frappe styles a number card `cursor: pointer` itself, so a card that
+does nothing when clicked means `public/js/card_routes.js` did not load — run `bench build --app
+moneytracker`. Two routes are deliberately unfiltered: Total Balance / Net Worth span every
+account, and Subscription Spend counts a cancelled subscription that is still being paid for and
+skips one in a trial, which no list filter can say.
 
 ### The charts
 
@@ -855,13 +881,246 @@ Income **1,20,000** and Expense **39,699** for every month after this one.
 
 ---
 
-## 16. Cleanup (optional)
+## 17. Tags — the same money read a second way
+
+Everything in §17–§23 is on the **demo household**, which now seeds all of it. Nothing needs
+creating first.
+
+Open **Money Tag** from the workspace (Quick Actions). Three: `Family`, `Essentials`, `Treats`.
+
+1. Open a grocery transaction — filter Transaction by category **Groceries**, pick one dated
+   the 8th. The **Tags** field is a pill widget, not a grid. It should show `Family` and
+   `Essentials`.
+2. **Add a third tag to it.** The transaction is *submitted*: `tags` is one of only three
+   fields on Transaction that may change after submission. An Update button should appear and
+   the save should stick. If Desk refuses, `allow_on_submit` has not migrated.
+3. Open the tag picker on a transaction and confirm it offers **only this tracker's** tags.
+4. Remove the third tag again.
+
+**Expected totals** — `Essentials` ₹24,000 · `Family` ₹18,400 · `Treats` ₹4,800.
+
+The rows sum to **₹47,200** but only **₹28,800** is tagged, because `Family` always appears
+beside another tag. That gap is the point of tags and is why they are drawn as a ranked bar and
+never as a pie.
+
+## 18. Splits — one payment, several categories
+
+Filter Transaction by **date = 8th** of the most recent complete month and find the grocery
+run of **₹6,800**.
+
+1. It has **no category** — the Category field is empty. A split transaction has no single one.
+2. The **Split Across Categories** grid holds two rows: Groceries **5,440** and Household
+   **1,360**.
+3. Open the linked **Journal Entry**. It has **three** lines: two debits and one credit of
+   6,800.
+4. On a *new* Expense, add two split rows that do **not** add up to the amount. The error
+   should name both figures.
+5. Change the transaction type to **Transfer**. The Splits section should disappear and any
+   rows should clear.
+
+## 19. Transfer fees
+
+Find the Transfer of **₹25,000** dated the 8th of the current month.
+
+1. The **Fee** section shows 50, charged to `Bank Charges & Fees`.
+2. Its Journal Entry has **three** lines — destination 25,000, fee 50, source credited
+   **25,050**. The destination receives what was sent; the source pays the charge on top.
+3. Switch a new transaction between Expense and Transfer and watch the Fee section appear and
+   disappear. On an Expense, entering a fee should be refused: every other type already has a
+   category of its own.
+4. Check the fee reaches spending — the `Bank Charges & Fees` category total should include it.
+   This is the one part of a transfer that is expense.
+
+## 20. Reconciliation
+
+Open **Money Account → HDFC Bank** and press **Reconcile**.
+
+1. Enter today's date and a closing balance of **69,500**. The dialog should read
+   *book 2,19,950 · ticked off 69,500 · difference 0* and say the account agrees.
+   The first demo month is seeded already reconciled, which is why it is not zero.
+2. Enter **70,000** instead. The difference should read **500** in red, with the note that a
+   transaction is missing or wrong — there is deliberately **no adjustment button**.
+3. Tick two lines from the unticked list and confirm. The cleared balance moves; **the account
+   balance does not**. Reconciling changes no money.
+4. Open one of them: **Reconciled** is ticked and **Cleared Date** is filled. Both are editable
+   on a submitted transaction, because the statement arrives weeks later.
+
+## 21. Bills, receipts and merchants
+
+**Bills** — three are seeded.
+
+| Bill | Amount | Expect |
+|---|---|---|
+| Society Maintenance | ₹2,500 | **Overdue** — the one state a standing order cannot have |
+| Broadband | ₹1,199 | Upcoming, due in a few days |
+| Water Bill | *Varies* | Upcoming; the Amount field is hidden |
+
+1. The block at the top of each form shows the amount, an outcome pill and the days to go.
+2. Press **Mark Paid** on Broadband. The dialog pre-fills the amount; confirm. It should post a
+   Transaction, flip the bill to Paid, and — because it repeats monthly — **mint the next one**,
+   linking to both in the alert. Check only **one** unpaid Broadband exists afterwards.
+3. Press **Mark Paid** on Water Bill. The amount is **not** pre-filled, because it varies.
+4. On the workspace, the **Bills** section shows **Bills Due ₹3,699** and **Overdue Bills
+   1 overdue**. After paying Broadband, Bills Due changes.
+
+**Receipts** — open **Money Receipt**. Two: one attached to a restaurant transaction, one in the
+inbox with no transaction at all. The files do not exist on disk, so previews will be broken —
+that is expected; the record shape is what is being checked. Upload a real JPG to one and
+confirm a thumbnail appears; upload a PDF and confirm it does not.
+
+**Merchants** — open **Money Merchant**. Seventeen: twelve created by the migration from the old
+free-text field, and five vendors that came in with the subscriptions in §22. Note `Netflix, Spotify`, `Auto, bus` and `IRCTC, hotel` — the field had been used as a
+note, and the migration recorded what was written rather than guessing at a split. Set a
+**Default Category** on `DMart`, then start a new Expense and pick DMart as merchant: the
+category should fill itself in, and should **not** overwrite one you typed first.
+
+Top merchants: `Landlord` ₹1,75,000 (47.0%) · `Croma` ₹36,800 · `DMart` ₹34,000 ·
+`Reliance Fresh` ₹26,000. Unlike tags, these **do** add up — a transaction has one merchant.
+
+## 22. Subscriptions — the terms, where a plan holds only the money
+
+Five are seeded, one in every state a subscription can be in. Open **Money Subscription**
+from Quick Actions.
+
+| Subscription | Billed | Expect |
+|---|---|---|
+| Adobe Photoshop | ₹12,999 Yearly | **Cancel By** — the notice window is closing |
+| Notion AI | ₹800 Monthly | **Trial Ending** — free until the trial runs out |
+| Netflix | ₹649 Monthly | **Renewing Soon**, and a price history: it was ₹499 |
+| Gym Membership | ₹1,500 Monthly | **Paused** — costs nothing, still on the list |
+| Cloud Storage | ₹199 Monthly | **Cancelled**, and still being paid for until its end date |
+
+1. The block at the top of each form shows the price, an outcome pill, what it costs **a
+   month**, and the renewal date. Adobe is billed yearly, so its monthly figure is
+   **₹1,083.25** — the one number that lets it be compared with Netflix.
+2. Open **Netflix** and look at **Price History**: two rows, ₹499 from the start and ₹649 from
+   June. The block says *Was ₹499 → ₹649*. **Now type ₹749 over the price and save** — a third
+   row appears, dated today, and the old ones stay. That is the whole rule: the history is the
+   truth and the field is a cache of the newest row. Set it back to ₹649 afterwards (which
+   correctly leaves *today's* row saying 649, not a fourth row).
+3. Press **Record Price Change** on any of them and give it a date in the past. The point of
+   the dialog is the date: a letter saying the price went up on the 1st arrives on the 9th.
+4. Open **Adobe Photoshop**. It has a ten-day notice period, so the block carries a **Cancel
+   by** date that is *earlier* than the renewal. That date is the only thing in this app a
+   standing order cannot express, and it is why the doctype exists.
+5. Open **Notion AI**. It is in a trial, so **Subscription Spend does not include its ₹800** —
+   nobody is paying for it yet. It is the only state in the app where doing nothing costs money.
+6. Open **Cloud Storage**: cancelled, with an end date in the future, and **still counted** in
+   Subscription Spend. Cancelling in August does not stop the money going out in September.
+7. Press **Cancel Subscription** on the Gym. The dialog asks what date it runs until, not for a
+   confirmation — that is the same rule.
+8. Check the refusals: a second subscription called `Netflix` on this tracker, a price of zero,
+   a trial ending before the start date, an end date before the start date.
+9. **Link one to a plan.** Set *Paid By Plan* on Netflix to `Streaming Subscriptions` and save.
+   The block gains a line: **the plan paying it charges something else** — the plan is ₹1,499
+   because it pays for Netflix *and* Spotify. That is reported, never refused: knowing about a
+   price rise before the standing order is updated is the normal order of events. Now try to
+   put the same plan on Cloud Storage — refused, because one plan pays one subscription or its
+   money is counted twice. Clear the link again when you are done.
+10. On the workspace, the **Subscriptions** section shows **Subscription Spend ₹1,931.25**
+    (Adobe 1,083.25 + Netflix 649 + Cloud Storage 199) and **Trials Ending 1 ending**.
+
+✅ **The key check:** Subscription Spend and Fixed Costs **overlap on purpose** and are never
+added together. Fixed Costs is what leaves the account every month; Subscription Spend is what
+you are signed up to. A household cancels a subscription, not a standing order.
+
+✅ Note that **Money Merchant now holds 17**, not twelve — the five vendors above were created
+alongside the subscriptions. `Netflix` and `Netflix, Spotify` both exist, which is the honest
+picture: the second came from the old free-text field and the first was typed as a vendor.
+
+## 23. Loans — one payment, two facts
+
+Two are seeded, one each way, because `direction` is what every sign in a loan posting follows
+from. Open **Money Loan** from Quick Actions.
+
+| Loan | Terms | Expect |
+|---|---|---|
+| Personal Loan | ₹2,00,000 borrowed, 12% reducing, 24 months | **In Arrears** — one instalment behind on purpose |
+| Loan to Ravi | ₹50,000 lent, interest-free, 10 months | **On Schedule** |
+
+1. Open **Personal Loan**. The block shows what is still owed — **₹1,77,532.74** — a progress
+   bar, and the footnotes: *3 of 24 instalments paid*, *1 behind*, and **₹25,952.70 interest over
+   the tenure**. That last figure is the one a schedule exists to show.
+2. Expand **Schedule**. Twenty-four rows, every one of them read-only. Check three things by eye:
+   each row's principal + interest = its payment; the **interest falls** month by month (that is
+   what "reducing balance" means); and the **last row's closing balance is exactly 0.00**. A
+   level instalment rounded to paise cannot clear the principal, so the final row absorbs the
+   difference — if it reads 0.01 or −0.03, that is a real finding.
+3. The **Instalment** field is read-only and reads **₹9,414.69**. It is worked out from the terms.
+   Put 9,500 in *Instalment (as per lender)* and save: the whole table rebuilds around the new
+   figure and still closes at zero. Take it out again.
+4. **Try to change a term.** Set the rate to 18% and save. It should refuse — three payments have
+   been posted, so the terms are frozen. This is the rule that makes a *stored* schedule safe: a
+   loan is not renegotiated by editing a field. Now change **Notes** and save: fine. Freezing the
+   terms must not freeze the document.
+5. Press **Post Instalment**. The amount pre-fills to the instalment; confirm. It posts a
+   **Loan Payment** and the alert names the split. Open the transaction: it has **no category**,
+   an **Interest** figure, and a linked Journal Entry with **three** lines — the loan account
+   debited by the principal, `Interest Paid` debited by the interest, the bank credited the whole
+   payment. The loan should now read **On Schedule**.
+6. Press **Post Instalment** again with an amount of **20,000**. The interest stays at the
+   scheduled figure and everything above it goes to principal — which is exactly what a
+   part-prepayment is. The agreement says what this month's interest is; paying a round number
+   does not change it.
+7. Open **Loan to Ravi**. Money owed *to* the household, so it sits on an **asset** account and
+   its interest category is an **income** one. Its Journal Entries are the mirror image: the bank
+   debited, the loan account credited.
+8. **Check the interest reaches spending.** `Interest Paid` should appear in the Expense category
+   roll-up with the interest paid so far, and **not** with the principal — the principal is a
+   balance coming down, not money spent. This is the same rule a transfer fee follows (§19), and
+   the reason both live in one table.
+9. Make a new loan and try the refusals: a bank account as the loan account for something
+   borrowed (it must be a liability), an income category for interest on borrowed money, a tenure
+   of 0, a principal of 0, a lender's instalment of ₹500 on a two-lakh loan (it does not even
+   cover the first month's interest, so the loan would never be repaid).
+10. On the new loan, press **Post Instalment** before disbursing. Refused: until the principal is
+    on the books there is nothing to repay, and the block reads **Not Disbursed**. Press
+    **Disburse**, pick an account, and watch a plain **Transfer** appear — nobody is richer or
+    poorer for having borrowed, so it touches neither income nor expense.
+11. Press **Close Loan** on it while the balance is still outstanding: refused. A loan reading
+    closed over a live balance would understate every debt figure in the app.
+12. On the workspace, the **Loans** section shows **Debt Outstanding ₹1,77,532.74** and
+    **Loans in Arrears 1 behind**. Click each: the first goes to the borrowed loans, the second
+    to the active ones.
+
+✅ **The key check:** Debt Outstanding counts **borrowed** loans only. `Loan to Ravi` is money the
+household is owed — an asset — and netting the two would give a figure that answers no question.
+It is the same reasoning that keeps credit-card debt out of Total Balance.
+
+✅ Note that **Total Balance is much larger than it was in §7's demo figures** and Net Worth is
+about the same. That is correct and is the point: the household really did borrow ₹2,00,000, and
+it really does owe it.
+
+## 24. What is deliberately not wired
+
+Not defects; scope not yet reached. Do not raise these as bugs.
+
+- No **Spending by Tag** or **Top Merchants** chart on the workspace. The services and APIs
+  exist; the chart fixtures are A3.
+- No **report** anywhere in the app — `report/` does not exist yet. ERPNext's five reports are
+  still the only ones, under Ledger & Reports. *Subscriptions by Renewal* is named in the A2.1
+  spec and is deliberately not built: `services/subscriptions.get_renewals` already returns the
+  figure, and the report is A3 along with the rest of `report/`.
+- No **subscription or loan chart** on the workspace, for the same reason as the tag and merchant
+  ones. An amortisation chart is a natural A3 addition; `api/loans.get_schedule` already returns
+  the series.
+- No **asset** behind a loan. A car loan is disbursed to the dealer and what you get is the car,
+  and `Money Asset` is A4.2 — which is why the demo seeds a *personal* loan, the kind that really
+  does land in your bank account.
+- The **receipt inbox** has no screen of its own; `api/receipts.get_unattached` returns it, but
+  you reach unattached receipts through the Money Receipt list.
+- Split and fee category pickers are filtered to expense leaves, but the **grid does not show a
+  running total** of the split rows against the amount.
+
+## 25. Cleanup (optional)
 
 Desk will not let you delete a submitted transaction, so:
 
 1. Cancel each `Desk Test` transaction, then delete it.
-2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14 and the `DT *`
-   plans from §15 — none is submittable, so they just delete. Deleting a plan leaves the
+2. Delete the six `DT *` goals from §13, the three `DT *` budgets from §14, the `DT *`
+   plans from §15 and any `DT *` bills, tags, merchants, receipts, subscriptions or loans from
+   §17–§23 — none is
+   submittable, so they just delete. Deleting a plan leaves the
    transactions it posted behind, with the link cleared; cancel and delete those with the rest.
 3. Delete `DT Groceries`, `DT Food`, `DT Salary`.
 4. Delete `DT Bank`, `DT SBI`, `DT Card`.
@@ -897,6 +1156,14 @@ Two things deliberately survive and are safe to leave:
   one missed occurrence — §15 is monthly throughout and every plan there is one day old. Both
   are covered by the automated suite, along with the `MAX_PER_RUN` bound and the savepoint that
   keeps one broken plan from stopping the nightly job.
+- A **Daily, Weekly or Fortnightly** billed subscription, and one measured across a window in
+  which its price changed — §22 is monthly and yearly throughout, and reads the price as of one
+  day. Both are covered by the automated suite, along with the `Notice Passed` outcome, which
+  the demo deliberately does not seed: it is a fact nobody can act on, so it is not worth a
+  click-through.
+- A **flat-interest** loan, and a loan billed anything other than monthly — §23 is reducing
+  balance and monthly throughout. Both are covered by the automated suite, along with the
+  interest-only instalment and the single bullet repayment.
 - A budget measured **while its period is still running**. §14 clamps every envelope to a
   closed August on purpose, so its figures read the same whenever you run it; the demo
   household's five budgets are the live case, and their pace markers sit mid-bar.

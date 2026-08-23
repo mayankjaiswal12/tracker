@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, fmt_money
+from frappe.utils import flt, fmt_money, getdate
 
 from moneytracker.money_tracker.posting import engine
 from moneytracker.money_tracker.services import fx
@@ -12,6 +12,13 @@ from moneytracker.money_tracker.services import settings as settings_service
 
 # Types where `destination_account` is the other side of the movement rather than a category.
 ACCOUNT_TO_ACCOUNT_TYPES = ("Transfer", "Credit Card Payment")
+
+# Types that carry no single category, and therefore no splits either. A movement between two
+# accounts has none by construction; a Loan Payment has *two* halves with different answers —
+# principal, which has no category because it is a balance coming down, and interest, whose
+# category is the loan's. Everything that sums categories reads those halves through
+# `services/categories.py`, the same way it reads a split row or a transfer fee.
+NO_CATEGORY_TYPES = (*ACCOUNT_TO_ACCOUNT_TYPES, "Loan Payment")
 
 
 class Transaction(Document):
@@ -34,6 +41,11 @@ class Transaction(Document):
 		# After `set_base_amount`, which is where `exchange_rate` is resolved — each split row
 		# is stamped with its own base amount at that rate.
 		self.validate_splits()
+		self.validate_fee()
+		# After `set_base_amount` for the same reason the fee is: `interest_base_amount` is
+		# stamped at the transaction's own rate.
+		self.validate_loan()
+		self.validate_reconciliation()
 
 	def apply_merchant_defaults(self):
 		"""Let the merchant fill in what has been left blank, and nothing else.
@@ -43,7 +55,7 @@ class Transaction(Document):
 		always wins. Runs in `before_validate` so `validate_category` still gets the last word
 		on whatever ends up there.
 		"""
-		if not self.merchant or self.transaction_type in ACCOUNT_TO_ACCOUNT_TYPES:
+		if not self.merchant or self.transaction_type in NO_CATEGORY_TYPES:
 			return
 
 		defaults = frappe.db.get_value(
@@ -81,6 +93,12 @@ class Transaction(Document):
 		elif self.destination_account:
 			self.destination_account = None
 
+		if self.transaction_type in NO_CATEGORY_TYPES:
+			# The same reason as above, one step wider: a Loan Payment's money is already broken
+			# into principal and interest, so a category on the voucher would be a third answer
+			# to a question that already has two.
+			self.category = None
+
 	def validate_category(self):
 		"""A group category is a heading, not a place to post.
 
@@ -116,10 +134,10 @@ class Transaction(Document):
 		if not self.splits:
 			return
 
-		if self.transaction_type in ACCOUNT_TO_ACCOUNT_TYPES:
+		if self.transaction_type in NO_CATEGORY_TYPES:
 			frappe.throw(
 				_(
-					"A {0} moves money between accounts, so there is nothing to split across categories."
+					"A {0} does not have a single category, so there is nothing to split across categories."
 				).format(self.transaction_type)
 			)
 
@@ -163,6 +181,126 @@ class Transaction(Document):
 
 		# Last, so the checks above still had the single category available to compare against.
 		self.category = None
+
+	def validate_fee(self):
+		"""A fee belongs to a movement between accounts, and is expense wherever it lands.
+
+		Only Transfer and Credit Card Payment can carry one: every other type already has a
+		category of its own, and a "fee" on an expense is simply part of the expense.
+
+		Like the split rows, `fee_base_amount` is stamped at the transaction's own rate, so
+		this runs after `set_base_amount` too.
+		"""
+		if not flt(self.fee_amount):
+			self.fee_amount = 0
+			self.fee_category = None
+			self.fee_base_amount = 0
+			return
+
+		if self.transaction_type not in ACCOUNT_TO_ACCOUNT_TYPES:
+			frappe.throw(
+				_(
+					"Only a Transfer or a Credit Card Payment carries a fee. A charge on a {0} is part of it."
+				).format(self.transaction_type)
+			)
+		if flt(self.fee_amount) < 0:
+			frappe.throw(_("Fee Amount cannot be negative."))
+		if not self.fee_category:
+			frappe.throw(_("A fee is spending, so it needs an expense category to be charged to."))
+
+		category = frappe.db.get_value(
+			"Category",
+			self.fee_category,
+			["tracker", "category_type", "is_group", "category_name"],
+			as_dict=True,
+		)
+		if category.tracker and category.tracker != self.tracker:
+			frappe.throw(_("Category {0} belongs to another tracker.").format(category.category_name))
+		if category.is_group:
+			frappe.throw(
+				_("{0} is a group category. Charge the fee to one of its sub-categories.").format(
+					category.category_name
+				)
+			)
+		if category.category_type != "Expense":
+			frappe.throw(_("{0} is an income category. A fee is spending.").format(category.category_name))
+
+		self.fee_base_amount = flt(self.fee_amount) * (flt(self.exchange_rate) or 1.0)
+
+	def validate_loan(self):
+		"""An instalment names its loan, and the interest is checked against the payment.
+
+		The interest is *not* worked out here. It comes off the loan's schedule, which is what
+		`Money Loan.post_instalment` fills it in from, because the agreement says what this
+		month's interest is and paying a round number does not change it. What is checked is that
+		the figure typed in is possible: interest larger than the payment would post a negative
+		principal, which balances perfectly and means nothing.
+
+		The interest *category* is stamped from the loan rather than accepted from the form. It is
+		a term of the loan and not a choice about one payment, and keeping it in one place is what
+		lets `services/categories.py` find this money with a single grouped query.
+		"""
+		if self.transaction_type != "Loan Payment":
+			self.loan = None
+			self.interest_amount = 0
+			self.interest_category = None
+			self.interest_base_amount = 0
+			return
+
+		if not self.loan:
+			frappe.throw(_("A Loan Payment has to name the loan it pays."))
+
+		loan = frappe.db.get_value(
+			"Money Loan",
+			self.loan,
+			["tracker", "loan_name", "status", "interest_category", "loan_account"],
+			as_dict=True,
+		)
+		if loan.tracker and loan.tracker != self.tracker:
+			frappe.throw(_("Loan {0} belongs to another tracker.").format(loan.loan_name))
+		if loan.status == "Closed":
+			frappe.throw(
+				_("{0} is closed. Reopen it before posting another payment against it.").format(
+					loan.loan_name
+				)
+			)
+		if loan.loan_account == self.account:
+			frappe.throw(_("A loan cannot be repaid from the loan account itself."))
+
+		if flt(self.interest_amount) < 0:
+			frappe.throw(_("Interest cannot be negative."))
+		if flt(self.interest_amount) > flt(self.amount):
+			frappe.throw(
+				_("Interest of {0} is more than the payment of {1}.").format(
+					flt(self.interest_amount), flt(self.amount)
+				)
+			)
+
+		self.interest_category = loan.interest_category
+		if flt(self.interest_amount) and not self.interest_category:
+			frappe.throw(_("Loan {0} has no interest category.").format(loan.loan_name))
+
+		self.interest_base_amount = flt(self.interest_amount) * (flt(self.exchange_rate) or 1.0)
+
+	def validate_reconciliation(self):
+		"""Ticking a line off a statement, and the date the statement says it cleared.
+
+		Neither field is about the money — they record that a human has seen this line on a
+		bank statement — which is why both carry `allow_on_submit` alongside `tags`. A
+		reconciliation that could only happen before submission would be useless: the statement
+		arrives weeks later.
+
+		The date defaults to the transaction's own rather than to today, because the common
+		case is a line that cleared when it was made and the uncommon one is a cheque that took
+		a fortnight.
+		"""
+		if not self.is_reconciled:
+			self.cleared_date = None
+			return
+		if not self.cleared_date:
+			self.cleared_date = self.date
+		if getdate(self.cleared_date) < getdate(self.date):
+			frappe.throw(_("Cleared Date cannot be before the transaction's own date."))
 
 	def validate_tags(self):
 		"""Tags must belong to this tracker, and each may appear once.
@@ -214,6 +352,7 @@ class Transaction(Document):
 		rather than trusted to have happened at insert.
 		"""
 		self.validate_tags()
+		self.validate_reconciliation()
 
 	def before_submit(self):
 		engine.check_sufficient_balance(self)
@@ -267,6 +406,14 @@ class Transaction(Document):
 			reversal.transaction_type = "Expense"
 		elif self.transaction_type == "Income":
 			frappe.throw(_("Reversing an Income is not supported yet. Cancel the transaction instead."))
+		elif self.transaction_type == "Loan Payment":
+			# A reversal has to be some transaction type that exists, and "un-paying an
+			# instalment" is not one: it would put principal back onto the loan and take interest
+			# out of expense. That is a cancellation rather than a correction, and cancelling
+			# does exactly it.
+			frappe.throw(
+				_("Cancel a Loan Payment rather than reversing it, so the loan's schedule stays honest.")
+			)
 
 		reversal.insert()
 		reversal.submit()

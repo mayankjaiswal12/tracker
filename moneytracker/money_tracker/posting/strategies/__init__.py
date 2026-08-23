@@ -18,6 +18,7 @@ from moneytracker.money_tracker.posting.strategies import (
 	credit_card_payment,
 	expense,
 	income,
+	loan_payment,
 	refund,
 	transfer,
 )
@@ -28,6 +29,7 @@ STRATEGIES = {
 	"Transfer": transfer.build_legs,
 	"Credit Card Payment": credit_card_payment.build_legs,
 	"Refund": refund.build_legs,
+	"Loan Payment": loan_payment.build_legs,
 }
 
 # Declared in the Transaction DocType and designed for, but not yet implemented.
@@ -35,7 +37,6 @@ STRATEGIES = {
 PLANNED = (
 	"Reimbursement",
 	"Adjustment",
-	"Loan Payment",
 	"Investment Purchase",
 	"Investment Sale",
 	"Dividend",

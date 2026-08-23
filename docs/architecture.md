@@ -83,9 +83,16 @@ account — which is why a card balance *grows* where a bank balance shrinks.
 | SBI Bank *(asset)* | 10,000.00 | |
 | HDFC Bank *(asset)* | | 10,000.00 |
 
-Both sides are balance-sheet accounts, so a transfer **cannot** appear as income or
+Both sides are balance-sheet accounts, so the **movement** cannot appear as income or
 expense — not by policy, but by construction. Moving your own money between pockets is the
 classic way a naive tracker double-counts spending.
+
+A fee is the one exception, and it is not a hole in the rule so much as the other half of it.
+Transferring 10,000 with a 50 charge debits the destination 10,000, debits an expense category
+50, and credits the source 10,050: what arrives and what the bank keeps are two different
+facts, and only one of them is spending. Booking the charge as part of the movement would
+leave both balances correct while understating expenses — the hardest kind of wrong to
+notice.
 
 ### Refund — ₹300 refunded against that bill
 
@@ -152,8 +159,9 @@ identically on Frappe's select validation.
   incremental counter drifts and gives no sign that it has.
 - **Debits equal credits, checked before anything is written.** ERPNext revalidates on
   submit, but then the error names a Journal Entry the user has never heard of.
-- **Transfers and credit-card payments touch only balance-sheet accounts**, so they can
-  never surface as income or expense.
+- **The movement in a transfer or credit-card payment touches only balance-sheet accounts**,
+  so it can never surface as income or expense. An explicitly entered *fee* is the exception
+  and is expense, because the bank kept it.
 - **A refund credits the category**, it is not income.
 - **History is reversed, not erased.** Cancelling writes reversing GL rows; `on_trash`
   blocks deleting a posted transaction.
@@ -209,18 +217,108 @@ moneytracker/patches/v1_0/
 
 ## Where it stands
 
-Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions. All of it is
-covered by **523 tests** (`bench --site tracker.localhost run-tests --app moneytracker`).
+Phase 1 is complete; Phase 2 has goals, budgets and recurring transactions; Phase 3 (A1 in
+`docs/roadmap.rst`) added tags, merchants, splits, transfer fees, reconciliation, receipts
+and bills; and A2 has added subscriptions and loans. All of it is covered by **891 tests**
+(`bench --site tracker.localhost run-tests --app moneytracker`).
 
 | | |
 |---|---|
-| **5** | posting strategies implemented, of fourteen declared types |
-| **9** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs |
+| **20** | DocTypes, of which **4** are child tables — the first arrived with A1 |
+| **6** | posting strategies implemented, of fourteen declared types — `Loan Payment` was the first of the nine planned ones to land |
+| **15** | dashboard Number Cards — balance, net worth, income, expenses, savings rate, goals, budgets, plans, fixed costs, bills due, overdue bills, subscription spend, trials ending, debt outstanding, loans in arrears |
 | **5** | Dashboard Charts — income vs expense, spending trend, goal progress, budget vs actual, upcoming recurring |
 | **6** | kinds of `Money Goal`, each a row in `GOAL_TYPES` plus one small measure function |
 | **4** | budget periods — weekly, monthly, quarterly, yearly — each a row in `PERIODS` |
-| **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES` |
-| **38** | categories seeded for a new tracker, as a two-level tree |
+| **6** | schedule frequencies — daily to yearly — each a row in `FREQUENCIES`, shared by plans and subscriptions |
+| **4** | daily scheduler jobs — recurring postings, budget alerts, bill reminders, subscription reminders |
+| **13** | tracker-scoped DocTypes, each registered in *both* hook dicts |
+| **39** | categories seeded for a new tracker, as a two-level tree |
+| **3** | kinds of money attached to a category on a voucher that has none — split rows, fees, loan interest — each a row in `SIDE_CHARGES` |
+
+### What A1 changed, and the rule it kept finding
+
+Seven modules landed in one phase, and three of them attach money to a category in a way the
+category tree cannot see on its own. A **split** transaction has several categories, so it
+carries none of its own. A **transfer fee** is charged on a voucher that has no category by
+construction. Both post correctly to the ledger and both were invisible to
+`get_category_totals` and `get_net_spend_by_date` until those were taught to read them.
+
+That is the same edit twice, and it is worth stating as a rule rather than as two anecdotes:
+
+> **Any new way of attaching money to a category needs both aggregation call sites updated**,
+> or the money reaches `GL Entry`, the bank balance stays right, and the spending disappears
+> from the roll-up, the chart and every budget. Nothing looks broken.
+
+Two other boundaries were drawn the way the goal/budget one was — name what each owns, then
+keep the other's fields off it:
+
+- **A bill is a claim; a plan is a schedule.** The giveaway is *overdue*, a state a plan cannot
+  have: if a plan has not posted the scheduler is broken, whereas an unpaid bill is a fact
+  about a person. They compose — a bill may name the plan that settles it.
+- **A tag is not a second category tree.** A category partitions spending and a transaction has
+  exactly one; a tag overlaps and a transaction may carry several. So tag totals deliberately
+  do not add up, and `tagged` and `total` are measured by a query that joins nothing.
+
+And one invariant had to be restated rather than defended — see *Transfer* above: the movement
+is balance-sheet only, but a fee is expense, because the bank kept it.
+
+
+### What A2.1 changed: the one thing that cannot be derived
+
+`Money Subscription` is the first module here that is **neither a measurement nor a posting**.
+A goal, a budget and a card read the ledger; a plan writes to it. A subscription does neither —
+it records the terms of an arrangement, and the money either comes from the plan it links to or
+from somebody paying by hand. So it contains no strategy, no `generate()` and no Journal Entry.
+
+The boundary is the one `services/recurring.py` had already drawn: *a plan is the money and the
+calendar, and knows nothing about who is being paid or on what terms.* A subscription owns that
+other half — vendor, tier, trial end, notice period — and **links to** a plan rather than growing
+a second schedule. One plan pays one subscription, or its money is claimed twice.
+
+And it forced the app's first genuine exception to *derive, never store*:
+
+> **A price cannot be measured from the ledger.** Nothing in `GL Entry` distinguishes a price
+> rise from a month somebody forgot to pay — both look like a smaller number, or none at all. So
+> `Money Subscription Price` is the source of truth for price, and `amount` on the parent is a
+> cache of the newest row, exactly the relationship `Money Account.current_balance` has with the
+> ledger. Everything else about a subscription — the renewal date, the cancel-by date, the
+> monthly equivalent, the outcome word — is still derived on read.
+
+The cancel-by date is worth naming separately, because it is the only thing in this app a
+standing order cannot express: a plan has no counterparty to give notice to. It is also the
+reason `Subscription Spend` and `Fixed Costs` are allowed to overlap and are never summed — one
+is what leaves the account every month, the other is what you are signed up to, and a household
+cancels a subscription rather than a standing order.
+
+### What A2.2 changed: one payment, two facts
+
+`Money Loan` exists for the sentence a Debt Payoff goal cannot say: **every instalment is part
+principal and part interest, and only one of those is spending.** The principal is a balance-sheet
+movement — the household is no poorer for having paid it, it simply owes less. The interest is the
+price of the money and is gone. Book the whole instalment as expense and expenses are overstated
+by the principal every month; book none of it and the entire cost of borrowing vanishes. So a
+`Loan Payment` posts three legs, and it is the first of the nine planned strategies to be built.
+
+`direction` is a field rather than a note because **both readings balance**. Money borrowed sits
+on a liability and its interest is expense; money lent sits on an asset and its interest is
+income. Reverse them and the entry still posts three balanced legs, while the Balance Sheet
+quietly reports that the household owns what it owes. Nothing downstream can catch that, so the
+loan's own controller checks the sides at Save and the strategy trusts it.
+
+Two smaller things are worth recording because both were found rather than designed:
+
+- **A loan has to be disbursed.** Until the principal is on the books the loan account sits at
+  zero — indistinguishable from a loan paid off — and repayments drive it negative. Disbursal
+  turned out to need no new strategy at all: it is a **Transfer**, a movement between two
+  balance-sheet accounts, which is exactly what borrowing is. `Not Disbursed` is a derived
+  outcome so the app says which of the two zero means.
+- **A transfer fee had never reached the spending trend.** Interest is charged to a category on a
+  voucher whose type is not a spending type, and so is a fee; teaching the aggregation about the
+  third case exposed that the second had only ever been half-taught. A fee was spending on the
+  category roll-up and in every budget, and not spending on "Expenses This Month" or the chart.
+  The two hand-written queries are now one table, `categories.SIDE_CHARGES`, with a window form
+  for the periods.
 
 Goals, budgets and plans share one habit with `Money Account.current_balance`: **they store
 nothing they could derive**. A stored counter drifts the first time a transaction is

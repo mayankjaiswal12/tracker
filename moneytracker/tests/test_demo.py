@@ -19,7 +19,7 @@ from frappe.utils import get_first_day, getdate, today
 
 from moneytracker.money_tracker import demo
 from moneytracker.money_tracker.posting import strategies
-from moneytracker.money_tracker.services import coa, goals
+from moneytracker.money_tracker.services import coa, goals, loans, subscriptions
 from moneytracker.money_tracker.services.categories import DEFAULT_CATEGORIES
 from moneytracker.tests.utils import MoneyTrackerTestCase, unique
 
@@ -171,9 +171,7 @@ class TestDemoGoals(MoneyTrackerTestCase):
 
 	def test_the_plan_shows_every_measure_at_least_once(self):
 		"""The point of the demo set: each measure in GOAL_TYPES visible on the workspace."""
-		self.assertEqual(
-			{row["goal_type"] for row in demo.DEMO_GOALS}, set(goals.GOAL_TYPE_OPTIONS)
-		)
+		self.assertEqual({row["goal_type"] for row in demo.DEMO_GOALS}, set(goals.GOAL_TYPE_OPTIONS))
 
 	def test_every_goal_names_an_account_the_demo_creates(self):
 		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
@@ -241,6 +239,109 @@ class TestDemoGoals(MoneyTrackerTestCase):
 				self.assertGreaterEqual(target_date, start_date)
 
 
+class TestDemoSubscriptions(MoneyTrackerTestCase):
+	"""The subscription plan as data. A subscription is nothing but its state, so what can rot
+	here is a state the demo claims to show and no longer does."""
+
+	def test_every_subscription_names_an_account_the_demo_creates(self):
+		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			with self.subTest(subscription=row["subscription_name"]):
+				self.assertIn(row["account"], created)
+
+	def test_every_subscription_names_a_leaf_category_the_default_tree_seeds(self):
+		"""A leaf, not a group: the category is what a payment for it would be filed under,
+		and a transaction cannot post to a heading."""
+		leaves = seeded_categories()["Expense"]
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			with self.subTest(subscription=row["subscription_name"]):
+				self.assertIn(row["category"], leaves)
+
+	def test_every_payment_method_named_is_one_the_demo_seeds(self):
+		seeded = {name for name, _applies_to in demo.PAYMENT_METHODS}
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			with self.subTest(subscription=row["subscription_name"]):
+				self.assertIn(row["payment_method"], seeded)
+
+	def test_every_billing_frequency_is_one_the_table_knows(self):
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			with self.subTest(subscription=row["subscription_name"]):
+				self.assertIn(row["billing_frequency"], subscriptions.FREQUENCY_OPTIONS)
+
+	def test_the_plan_shows_a_trial_a_notice_period_and_a_price_rise(self):
+		"""The three things only a subscription has. A demo without them shows nothing this
+		doctype could not have been a standing order."""
+		self.assertTrue(any("trial_in_days" in row for row in demo.DEMO_SUBSCRIPTIONS))
+		self.assertTrue(any(row.get("notice_period_days") for row in demo.DEMO_SUBSCRIPTIONS))
+		self.assertTrue(any(row.get("prices") for row in demo.DEMO_SUBSCRIPTIONS))
+
+	def test_the_plan_shows_every_status_the_doctype_allows(self):
+		selectable = frappe.get_meta("Money Subscription").get_field("status").options.split("\n")
+		self.assertEqual({row.get("status", "Active") for row in demo.DEMO_SUBSCRIPTIONS}, set(selectable))
+
+	def test_no_subscription_claims_a_plan(self):
+		"""The household's one streaming standing order pays for two services, and a
+		subscription claims a whole plan. Linking one would misstate what the plan pays for."""
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			with self.subTest(subscription=row["subscription_name"]):
+				self.assertNotIn("recurring_transaction", row)
+
+	def test_a_price_rise_is_dated_before_today(self):
+		"""`record_price` would collide with the opening row if a rise were dated today, and a
+		rise in the future is not a rise that happened."""
+		for row in demo.DEMO_SUBSCRIPTIONS:
+			for offset, _amount, _note in row.get("prices", ()):
+				with self.subTest(subscription=row["subscription_name"], offset=offset):
+					self.assertLess(offset, 0)
+					self.assertGreater(offset, row["start_in_days"])
+
+
+class TestDemoLoans(MoneyTrackerTestCase):
+	"""The loan plan as data. Both directions, because `direction` is the field every sign in a
+	loan posting follows from and a demo with only one side proves nothing about it."""
+
+	def test_every_loan_names_an_account_the_demo_creates(self):
+		created = {name for name, _type, _group, _bank in demo.DEMO_ACCOUNTS}
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["loan_account"], created)
+				self.assertIn(row["account"], created)
+
+	def test_the_loan_account_is_on_the_side_the_direction_implies(self):
+		"""Both readings balance, so nothing downstream would catch it — the Balance Sheet would
+		simply say the household owns what it owes."""
+		for row in demo.DEMO_LOANS:
+			account_type = ACCOUNT_TYPES[row["loan_account"]]
+			with self.subTest(loan=row["loan_name"]):
+				self.assertEqual(coa.is_liability(account_type), row["direction"] == loans.BORROWED)
+
+	def test_the_interest_category_is_on_the_side_the_direction_implies(self):
+		leaves = seeded_categories()
+		for row in demo.DEMO_LOANS:
+			side = "Expense" if row["direction"] == loans.BORROWED else "Income"
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["interest_category"], leaves[side])
+
+	def test_the_plan_shows_both_directions(self):
+		self.assertEqual({row["direction"] for row in demo.DEMO_LOANS}, set(loans.DIRECTIONS))
+
+	def test_every_interest_type_is_one_the_table_knows(self):
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertIn(row["interest_type"], loans.INTEREST_TYPES)
+
+	def test_one_loan_is_deliberately_behind(self):
+		"""The only way to see the arrears state, or the card reading anything but zero."""
+		self.assertTrue(any(row["unpaid"] for row in demo.DEMO_LOANS))
+
+	def test_no_loan_is_disbursed_outside_the_demos_own_months(self):
+		"""A disbursal is a real posting, and ERPNext refuses one outside a Fiscal Year."""
+		for row in demo.DEMO_LOANS:
+			with self.subTest(loan=row["loan_name"]):
+				self.assertGreaterEqual(row["start_month"], 0)
+				self.assertLess(row["start_month"], demo.DEFAULT_MONTHS)
+
+
 class TestDemoRefusals(MoneyTrackerTestCase):
 	def test_it_refuses_to_run_during_a_test(self):
 		"""Without the opt-in. Demo data in a suite run would skew every total in it."""
@@ -280,7 +381,20 @@ class TestDemoRoundTrip(MoneyTrackerTestCase):
 	def test_one_month_posts_and_then_clears_completely(self):
 		before = {
 			doctype: frappe.db.count(doctype)
-			for doctype in ("Tracker", "Money Account", "Category", "Transaction", "Journal Entry")
+			for doctype in (
+				"Tracker",
+				"Money Account",
+				"Category",
+				"Transaction",
+				"Journal Entry",
+				"Money Subscription",
+				# The child table too: `Money Subscription` goes by `delete_doc`, which clears
+				# its rows — unlike `Transaction`, which goes by raw table delete and needs
+				# `TRANSACTION_CHILD_TABLES` for exactly that reason.
+				"Money Subscription Price",
+				"Money Loan",
+				"Money Loan Schedule",
+			)
 		}
 
 		with demo_allowed():
@@ -316,3 +430,22 @@ class TestDemoRoundTrip(MoneyTrackerTestCase):
 					demo.setup_demo_data(months=1, tracker_name=name)
 			finally:
 				demo.clear_demo_data(tracker=summary["tracker"])
+
+
+class TestTeardownLeavesNothingBehind(MoneyTrackerTestCase):
+	"""Transactions are cleared by raw table delete, so their child rows must go by hand."""
+
+	def test_the_child_table_list_matches_the_doctype(self):
+		"""Derived from the meta, so adding a child table and forgetting the teardown fails here
+		rather than leaving orphan rows nobody sees until something counts them."""
+		declared = set(demo.TRANSACTION_CHILD_TABLES)
+		actual = {
+			field.options
+			for field in frappe.get_meta("Transaction").fields
+			if field.fieldtype in ("Table", "Table MultiSelect")
+		}
+		self.assertEqual(
+			declared,
+			actual,
+			"demo.TRANSACTION_CHILD_TABLES is out of step with Transaction's child tables",
+		)

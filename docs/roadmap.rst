@@ -21,7 +21,16 @@ except where §4 names a dependency.
 Read ``CLAUDE.md`` for conventions, ``docs/architecture.md`` for why the ledger is ERPNext's,
 ``task.md`` for the current resume point, ``plan.md`` for the per-module build recipe and
 ``progress.md`` for what is actually built. The decisions behind everything below are §5 of
-this document. **This document plans; it does not record.** Nothing here is built.
+this document. **This document plans; it does not record** — ``progress.md`` is the live status.
+
+.. note::
+
+   **Phase A1 is built** as of 2026-08-22: tags, receipts, merchant master, splits, transfer
+   fees, reconciliation and bills, plus the Desk wiring and demo fixtures for all of them. 716
+   tests. None of it has been through the manual Desk pass yet, which is why every row in
+   ``progress.md`` still reads amber rather than green.
+
+   Everything from A2 onward is unbuilt.
 
 .. contents::
    :local:
@@ -31,11 +40,13 @@ this document. **This document plans; it does not record.** Nothing here is buil
 §0 · Gap analysis
 =================
 
-Thirty capabilities were requested. **9 are done, 13 are partial, 8 are absent.**
+Thirty capabilities were requested. As first assessed on 2026-08-22: **9 done, 13 partial,
+8 absent**. After phase A1 shipped the same day: **16 done, 10 partial, 4 absent**.
 
 The brief describes the app as supporting "basic features … income & expense entries,
-categories, accounts, dashboard, basic reports, authentication". That understates it by a good
-deal, and the table says where.
+categories, accounts, dashboard, basic reports, authentication". That understated it by a good
+deal even before A1, and the table says where. Verdicts below are **current**; where A1 changed
+one, the row says so.
 
 .. list-table::
    :header-rows: 1
@@ -56,14 +67,14 @@ deal, and the table says where.
      - **Done**
      - ``Money Account``: 17 types, opening balance + date, currency, icon, colour,
        ``is_active``, notes, credit limit, masked number, institution,
-       ``include_in_net_worth``. Grouped by a ``Money Account Group`` tree. Missing only
-       **reconciliation** (→ #24).
+       ``include_in_net_worth``. Grouped by a ``Money Account Group`` tree. Reconciliation
+       added in A1.
    * - 3
      - Transfers
-     - **Partial**
-     - ``strategies/transfer.py`` posts a Contra Entry touching only balance-sheet accounts, so
-       a transfer can never read as income or expense. Missing: a **fee leg**. Notes and
-       attachments are #21.
+     - **Done** *(A1)*
+     - ``strategies/transfer.py`` posts a Contra Entry whose *movement* touches only
+       balance-sheet accounts. A1 added the **fee leg**, which is the one part that is expense —
+       the source pays amount plus fee, the destination receives the amount.
    * - 4
      - Recurring transactions
      - **Partial**
@@ -72,16 +83,19 @@ deal, and the table says where.
        Missing: **Skip Next**, **custom interval**, **reminder before execution**.
    * - 5
      - Bill & payment reminders
-     - **Absent**
-     - No due date, no Mark Paid, no bill tracking anywhere.
+     - **Done** *(A1)*
+     - ``Money Bill``: due date, six repeat frequencies, Mark Paid posting a Transaction and
+       minting the successor, a daily reminder job, and two Number Cards.
    * - 6
      - Receipt management
-     - **Absent**
-     - No ``Attach`` or ``Attach Image`` field on any DocType.
+     - **Done** *(A1)*
+     - ``Money Receipt``: file, image, thumbnail, and the OCR columns nothing fills yet.
+       Standalone rather than a child table, so an unattached receipt is an inbox.
    * - 7
      - Tags
-     - **Absent**
-     - Zero tagging. Every ``tag`` grep hit is the substring inside "percentage".
+     - **Done** *(A1)*
+     - ``Money Tag`` + ``Money Transaction Tag``, a real child table so tag spend is a GROUP BY.
+       Totals overlap by design and are never summed.
    * - 8
      - Calendar view
      - **Absent**
@@ -89,9 +103,9 @@ deal, and the table says where.
    * - 9
      - Advanced search
      - **Partial**
-     - ``api.transactions.search_transactions`` filters query/tracker/account/category/type/
-       date/amount with paging. Missing: **tags, merchant, reference number**, **saved
-       filters**, global search registration.
+     - A1 added **tags**, **merchant** (resolved through ``merchants.search_names``, since the
+       column now holds IDs) and **reference number**. Still missing: **saved filters** and
+       global search registration — both A2.
    * - 10
      - Analytics
      - **Partial**
@@ -138,9 +152,10 @@ deal, and the table says where.
      - Boundary drawn in ``services/recurring.py``'s docstring; nothing built.
    * - 19
      - Merchant management
-     - **Partial**
-     - ``Transaction.merchant`` and the recurring plan both capture it — as **free-text
-       Data**. No master, so no per-merchant analytics.
+     - **Done** *(A1)*
+     - ``Money Merchant`` master, ``Transaction.merchant`` migrated Data → Link by
+       ``patches/v1_1/link_merchants``, defaults that fill a blank field on entry, and
+       per-merchant totals that — unlike tags — partition the money.
    * - 20
      - Payment methods
      - **Partial**
@@ -148,8 +163,8 @@ deal, and the table says where.
        Missing: **analytics by method**; ``applies_to_account_type`` is unvalidated free text.
    * - 21
      - Attachments
-     - **Absent**
-     - Same as #6.
+     - **Done** *(A1)*
+     - Same as #6. Voice notes remain unbuilt.
    * - 22
      - Currency support
      - **Partial**
@@ -159,7 +174,7 @@ deal, and the table says where.
    * - 23
      - Security
      - **Partial**
-     - ``permissions.py`` isolates by tracker across 7 DocTypes; 4 Finance roles. Core supplies
+     - ``permissions.py`` isolates by tracker across **11** DocTypes; 4 Finance roles. Core supplies
        ``Version``, ``Activity Log``, ``Access Log``. Missing: **``track_changes`` not
        enabled**, **PIN lock** (client-side), **``Money Account Group`` / ``Money Payment
        Method`` unscoped** (defensible — they are shared masters — but undocumented).
@@ -214,14 +229,19 @@ balance-sheet accounts. That is a structural guarantee most expense managers onl
 Part A · Expense-manager parity
 ===============================
 
-Phase A1 — core missing functionality
--------------------------------------
+Phase A1 — core missing functionality — **built**
+--------------------------------------------------
 
 .. note::
 
-   **Gated on the manual Desk pass.** ``task.md`` records it as owed and deferred four times
-   while the surface it covers grew three times. Nothing in A1 should land on a Phase 1 that
-   has never been looked at in a browser.
+   All seven shipped on 2026-08-22, on branches ``feat/phase-3-tags``,
+   ``feat/phase-3-merchants``, ``feat/phase-3-splits``, ``feat/phase-3-transfer-fees`` and
+   ``feat/phase-3-a1-rest``. The specifications below are kept as written rather than rewritten
+   in the past tense — where the built thing differs from the plan, ``progress.md`` and
+   ``docs/architecture.md`` are the record.
+
+   The manual Desk pass this phase was gated on is **still owed**, and now covers §17–§22 of
+   ``docs/manual-test-desk.md``.
 
 A1.1 · Tags
 ~~~~~~~~~~~
@@ -311,18 +331,31 @@ posts rent automatically is not waiting for anything. A credit-card bill is.
 Phase A2 — productivity
 -----------------------
 
-**A2.1 · Money Subscription** — boundary already drawn in ``services/recurring.py``: vendor,
-plan name, trial end, renewal date, price-change history (``Money Subscription Price`` child
-table), notice period, ``status``. **Links to** a ``Money Recurring Transaction`` for the money;
-grows no second schedule. Card ``Subscription Spend``, report *Subscriptions by Renewal*.
+**A2.1 · Money Subscription** ✅ **built 2026-08-23.** Vendor, tier, trial end, notice period and
+price history (``Money Subscription Price``), linking to a ``Money Recurring Transaction`` for the
+money and growing no second schedule. It **posts nothing** — the first module here that is neither
+a measurement nor a posting — and its price history is the only stored series in the app, because
+nothing in ``GL Entry`` can distinguish a price rise from a month somebody forgot to pay. The
+renewal date is *derived* rather than stored (``recurring.next_date`` off a billing anchor that a
+trial moves), so there is no cached next date, exactly as a plan has none. Cards
+``Subscription Spend`` **and** ``Trials Ending``. The report *Subscriptions by Renewal* is
+deliberately deferred to A3 with the rest of ``report/`` — ``get_renewals`` already returns it.
 
-**A2.2 · Money Loan** — the case a Debt Payoff goal does *not* cover: amortisation. Principal,
-rate, tenure, EMI, start date, ``interest_type``, lender, ``direction`` (Borrowed / Lent),
-party. ``Money Loan Schedule`` child table generated by ``services/loans.py:build_schedule()``
-— pure, no DB, tested without a site, the same shape as a posting strategy. Implements the
-**Loan Payment strategy** currently in ``strategies.PLANNED``, splitting each payment into
-principal (liability) and interest (expense). A Debt Payoff goal keeps the simple case; a loan
-owns the schedule.
+**A2.2 · Money Loan** ✅ **built 2026-08-23.** Amortisation — the case a Debt Payoff goal does
+*not* cover. Principal, rate, tenure, EMI, start date, ``interest_type``, ``direction``
+(Borrowed / Lent), counterparty; ``Money Loan Schedule`` generated by
+``services/loans.py:build_schedule()``, which is pure and tested without a document. Implements
+the **Loan Payment strategy** — the first of the nine ``strategies.PLANNED`` types to land —
+splitting each payment into principal (a balance-sheet movement, never spending) and interest
+(expense on money borrowed, income on money lent). Cards ``Debt Outstanding`` and
+``Loans in Arrears``.
+
+Three decisions came out of building it, all recorded in ``progress.md``. The schedule is
+**stored**, which is only safe because the terms **freeze** once a payment has been posted. A loan
+must be **disbursed** before anything can be repaid, and a disbursal needed no new strategy — it
+is a Transfer between two balance-sheet accounts. And the two hand-written aggregation queries for
+category-less money became one table, ``categories.SIDE_CHARGES``, which immediately exposed that
+transfer fees had never reached the spending trend.
 
 **A2.3 · Budget completion** — ``budget_basis`` (Category / Account / Tracker) so account-wise
 budgets work; ``Custom`` period in ``PERIODS`` honouring ``start_date``/``end_date`` literally;
@@ -672,47 +705,47 @@ rolls back per **class**, not per test.
      - **gate**
      - —
      - S
-   * - Tags
+   * - Tags ✅
      - A
      - A1
      - Desk pass
      - M
-   * - Receipts
+   * - Receipts ✅
      - A
      - A1
      - Desk pass
      - M
-   * - Merchant master
+   * - Merchant master ✅
      - A
      - A1
      - Desk pass
      - M
-   * - Splits
+   * - Splits ✅
      - A
      - A1
      - Desk pass
      - M
-   * - Transfer fees
+   * - Transfer fees ✅
      - A
      - A1
      - —
      - S
-   * - Reconciliation
+   * - Reconciliation ✅
      - A
      - A1
      - —
      - M
-   * - Bills
+   * - Bills ✅
      - A
      - A1
      - —
      - L
-   * - Subscriptions
+   * - Subscriptions ✅
      - A
      - A2
      - Bills
      - M
-   * - Loans + Loan Payment
+   * - Loans + Loan Payment ✅
      - A
      - A2
      - —
@@ -837,16 +870,28 @@ never be needed and costs a deployment, an auth contract and a second failure mo
 not a placeholder: nothing in the analyst brief is blocked on installing a scientific stack.
 Tier 2 exists so that stops being an assumption and becomes a switch.
 
-D3 — "Derive, never store" keeps two documented exceptions
------------------------------------------------------------
+D3 — "Derive, never store" keeps three documented exceptions
+------------------------------------------------------------
 
-The app measures figures from ``GL Entry`` on read. Part B breaks that twice, deliberately:
+The app measures figures from ``GL Entry`` on read. Part B breaks that twice and Part A once,
+all deliberately:
 
 - **External observations are stored** — a stock price, a reported EPS, a cohort benchmark.
   There is no ledger to re-derive them from. Every row carries ``source``, ``as_of``,
   ``ingested_on``.
 - **Advice snapshots are immutable** — an audit trail records what was said, not what would be
   said now.
+- **A subscription's price history is stored** (A2.1, ``Money Subscription Price``). This is the
+  same reason as the first, arriving in Part A: nothing in ``GL Entry`` distinguishes a price
+  rise from a month somebody forgot to pay. ``Money Subscription.amount`` is a *cache* of the
+  newest row, the relationship ``Money Account.current_balance`` has with the ledger — not a
+  second opinion about it.
+- **A loan's amortisation schedule is stored** (A2.2, ``Money Loan Schedule``) — and this one is
+  a genuine exception rather than an unmeasurable fact, since a schedule is a pure function of
+  the terms. What makes it safe is the rule beside it: **the terms freeze once a payment has been
+  posted against the loan.** A copy of something that cannot change cannot drift, and a loan is
+  not renegotiated by editing a field — it is closed and reopened on the new terms. What is
+  *owed* is not stored at all; that is the loan account's balance.
 
 Everything personal — ratios, savings rate, cash flow, runway, allocation — **stays derived**.
 

@@ -8,6 +8,8 @@ flat ERPNext Account, so ERPNext's own reports list the leaves side by side; the
 4,500" heading total is derived from the NestedSet `lft`/`rgt` bounds instead.
 """
 
+from dataclasses import dataclass
+
 import frappe
 from frappe.utils import flt, getdate
 
@@ -15,6 +17,45 @@ from frappe.utils import flt, getdate
 # and is the reason this list is not just "Expense": it gives spending back rather than
 # earning it, so it nets off the category it was originally spent on (§62).
 SPEND_TYPES = ("Expense", "Refund")
+
+
+@dataclass(frozen=True)
+class SideCharge:
+	"""Money attached to a category on a voucher that carries no category of its own.
+
+	Every one of these is invisible to a query that groups by `Transaction.category`, and every
+	one of them posts to `GL Entry` correctly and leaves the account balance right — so when one
+	goes missing, nothing looks broken. It simply disappears from the roll-up, from the spending
+	chart and from every budget.
+
+	That has now happened twice: transfer fees, and loan interest. It is a *table* rather than a
+	third hand-written query so that the third one is a row here and not a fourth bug — and so
+	that the rule in CLAUDE.md ("any new way of attaching money to a category needs both
+	aggregation call sites updated") is enforced by structure rather than remembered.
+
+	`side` is the category type the charge lands on. Loan interest on money *lent* is income, so
+	it must not be added to spending.
+	"""
+
+	amount_field: str
+	category_field: str
+	base_field: str
+	side: str
+	what: str
+
+
+SIDE_CHARGES = (
+	SideCharge("fee_amount", "fee_category", "fee_base_amount", "Expense", "a transfer fee"),
+	# The price of borrowing, on a voucher whose other half is a balance-sheet movement. A
+	# budget on "Interest Paid" is precisely there to catch this.
+	SideCharge(
+		"interest_amount",
+		"interest_category",
+		"interest_base_amount",
+		"Expense",
+		"interest on a loan",
+	),
+)
 
 
 def net_sign(transaction_type):
@@ -41,6 +82,10 @@ DEFAULT_CATEGORIES = {
 		("Travel", ()),
 		("Gifts & Donations", ()),
 		("Bank Charges & Fees", ()),
+		# The price of borrowing. A default rather than something each household invents,
+		# because `Money Loan` requires one and the alternative is filing interest under
+		# "Bank Charges", where it stops being separable from a 50-rupee transfer fee.
+		("Interest Paid", ()),
 		("Taxes", ()),
 		("Miscellaneous", ()),
 	),
@@ -132,6 +177,48 @@ def _split_rows(tracker, types, from_date=None, to_date=None, categories=None):
 	)
 
 
+def _side_charge_rows(tracker, side="Expense", from_date=None, to_date=None, categories=None):
+	"""Every `SIDE_CHARGES` amount on that side, as `(category, date, total)`.
+
+	One query per row of the table rather than one hand-written function per feature — see
+	`SideCharge`. Always the money going *that* way, never a refund, so no `net_sign` is
+	involved: a fee is not refundable and neither is interest already paid.
+	"""
+	rows = []
+	for charge in SIDE_CHARGES:
+		if charge.side != side:
+			continue
+
+		filters = {
+			"tracker": tracker,
+			"docstatus": 1,
+			charge.amount_field: [">", 0],
+			charge.category_field: ["is", "set"],
+		}
+		if from_date and to_date:
+			filters["date"] = ["between", [from_date, to_date]]
+		if categories is not None:
+			if not categories:
+				continue
+			filters[charge.category_field] = ["in", list(categories)]
+
+		rows.extend(
+			frappe._dict({"category": row[0], "date": row[1], "total": flt(row[2])})
+			for row in frappe.get_all(
+				"Transaction",
+				filters=filters,
+				fields=[
+					charge.category_field,
+					"date",
+					f"SUM(`{charge.base_field}`) as total",
+				],
+				group_by=f"{charge.category_field}, date",
+				as_list=True,
+			)
+		)
+	return rows
+
+
 def get_category_totals(tracker, category_type="Expense", from_date=None, to_date=None):
 	"""Every category on the tracker with its own total and its total including descendants.
 
@@ -175,6 +262,11 @@ def get_category_totals(tracker, category_type="Expense", from_date=None, to_dat
 		own[row.split_category] = flt(own.get(row.split_category, 0.0)) + net_sign(
 			row.transaction_type
 		) * flt(row.split_base_amount)
+
+	# A transfer fee and a loan's interest are both money charged to a category on a voucher
+	# that carries none. See `SIDE_CHARGES`.
+	for row in _side_charge_rows(tracker, category_type, from_date, to_date, categories=names):
+		own[row.category] = flt(own.get(row.category, 0.0)) + flt(row.total)
 
 	result = []
 	for category in categories:
@@ -251,6 +343,31 @@ def get_net_spend_by_date(tracker, category=None, from_date=None, to_date=None):
 		by_date[day] = flt(by_date.get(day, 0.0)) + net_sign(row.transaction_type) * flt(
 			row.split_base_amount
 		)
+
+	# And the side charges — a transfer fee, a loan's interest — which a budget on Bank Charges
+	# or on Interest Paid is precisely there to catch. The main query above cannot see either:
+	# it filters on SPEND_TYPES, and neither a Transfer nor a Loan Payment is one.
+	for row in _side_charge_rows(
+		tracker, "Expense", from_date, to_date, categories=subtree if category else None
+	):
+		day = getdate(row.date)
+		by_date[day] = flt(by_date.get(day, 0.0)) + flt(row.total)
+	return by_date
+
+
+def get_side_charges_by_date(tracker, side="Expense", from_date=None, to_date=None):
+	"""`SIDE_CHARGES` totals per day over the whole tracker, as `{date: amount}`.
+
+	The window form of the same table, for callers that measure a *period* rather than a
+	category — the spending trend and the month cards. Without it a transfer fee and a loan's
+	interest are spending on the category roll-up and on every budget, and not spending on the
+	dashboard: the same money reading two ways on one screen, which is the contradiction §33
+	exists to prevent.
+	"""
+	by_date = {}
+	for row in _side_charge_rows(tracker, side, from_date, to_date):
+		day = getdate(row.date)
+		by_date[day] = flt(by_date.get(day, 0.0)) + flt(row.total)
 	return by_date
 
 

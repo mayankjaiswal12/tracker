@@ -23,17 +23,31 @@ shared Company — the same mechanism that isolates one user from another.
 
 import frappe
 from frappe import _
-from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day, getdate, today
+from frappe.utils import (
+	add_days,
+	add_months,
+	flt,
+	fmt_money,
+	get_first_day,
+	get_last_day,
+	getdate,
+	today,
+)
 
 from moneytracker.money_tracker.services import balances
 from moneytracker.money_tracker.services import budgets as budgets_service
 from moneytracker.money_tracker.services import goals as goals_service
+from moneytracker.money_tracker.services import loans as loans_service
 from moneytracker.money_tracker.services import merchants as merchants_service
 from moneytracker.money_tracker.services import recurring as recurring_service
 from moneytracker.money_tracker.services import settings as settings_service
 
 # Written into the tracker's description. `clear_demo_data` refuses to touch a tracker
 # without it, so pointing the teardown at a real tracker called "Demo" cannot wipe it.
+# Every child table hanging off Transaction. Named here rather than discovered, so that adding
+# one and forgetting the teardown shows up as a failing test rather than as orphan rows.
+TRANSACTION_CHILD_TABLES = ("Money Transaction Split", "Money Transaction Tag")
+
 DEMO_MARKER = "moneytracker:demo-data"
 
 DEMO_TRACKER_NAME = "Demo Household"
@@ -45,6 +59,7 @@ ACCOUNT_GROUPS = (
 	("Banks", "Asset"),
 	("Cards", "Liability"),
 	("Cash", "Asset"),
+	("Loans", "Liability"),
 )
 
 # (method_name, applies_to_account_type) — also site-wide.
@@ -61,6 +76,11 @@ DEMO_ACCOUNTS = (
 	("Emergency Fund", "Savings", "Banks", "HDFC Bank"),
 	("HDFC Credit Card", "Credit Card", "Cards", "HDFC Bank"),
 	("Wallet", "Cash", "Cash", None),
+	# Where a loan's outstanding principal lives. A liability for money borrowed, and an
+	# ordinary asset for money lent — `Money Loan` refuses either the wrong way round, because
+	# both readings balance and only one of them is true.
+	("Personal Loan", "Loan", "Loans", "HDFC Bank"),
+	("Loan to Ravi", "Other Asset", None, None),
 )
 
 # One month of a salaried household, in day order. Accounts and categories are named, not
@@ -448,6 +468,191 @@ DEMO_RECURRING = (
 # --- setup -------------------------------------------------------------------------------
 
 
+# Tags cut across the category tree, so the demo needs transactions that are honestly two
+# things at once. `day` names the MONTHLY row to label, the same way DEMO_RECURRING adopts.
+DEMO_TAGS = (
+	{"tag_name": "Family", "color": "#7c3aed"},
+	{"tag_name": "Essentials", "color": "#0891b2"},
+	{"tag_name": "Treats", "color": "#db2777"},
+)
+
+# (day, tags), where `day` names a MONTHLY row — days are unique within it, the same handle
+# DEMO_RECURRING uses to adopt. The grocery run is Family and Essentials at once, which is the
+# whole point: tag totals overlap, and the demo should show that rather than hide it.
+#
+# `_create_tags` throws on a day that names no row. Getting this wrong is otherwise silent —
+# the tag is simply created and lands on nothing, which reads as a working demo with an empty
+# chart bar and took a reseed to notice.
+DEMO_TAGGED = (
+	(8, ("Family", "Essentials")),  # the grocery run
+	(15, ("Family", "Treats")),  # eating out
+	(18, ("Essentials",)),  # groceries again
+)
+
+# One bill of each kind worth seeing: a fixed one due shortly, one whose amount is never known
+# until it arrives, and one nobody paid.
+DEMO_BILLS = (
+	{
+		"bill_name": "Broadband",
+		"category": "Utilities",
+		"amount": 1199,
+		"due_in_days": 4,
+		"frequency": "Monthly",
+		"merchant": "MSEDCL",
+		"notes": "Due shortly — this is what a reminder looks like.",
+	},
+	{
+		"bill_name": "Water Bill",
+		"category": "Utilities",
+		"amount_varies": 1,
+		"due_in_days": 12,
+		"frequency": "Quarterly",
+		"notes": "Amount is only known when it arrives, so Mark Paid asks for it.",
+	},
+	{
+		"bill_name": "Society Maintenance",
+		"category": "Maintenance",
+		"amount": 2500,
+		"due_in_days": -6,
+		"frequency": "Monthly",
+		"notes": "Overdue on purpose: the one state a standing order cannot have.",
+	},
+)
+
+
+# One subscription in every state worth looking at, because a subscription is nothing but its
+# state: a trial about to convert, a notice window closing, one somebody paused, one cancelled
+# that is still being paid for, and one whose price went up.
+#
+# Dated relative to today rather than to the demo's months, for the same reason the bills are:
+# a notice period that closed in April is not a warning about anything.
+#
+# **None of them names the plan that pays it, and that is deliberate.** The household's one
+# streaming standing order pays for Netflix *and* Spotify together, and a subscription claims a
+# whole plan — one plan pays one subscription, or its money is counted twice. Linking Netflix to
+# it would misstate what the plan pays for. Linking a plan by hand is part of the Desk pass.
+#
+# `amount` is the **opening** price; `prices` are the rises since, as (days from today, amount,
+# note). The controller keeps the two in step, so the seeder never writes the current price.
+DEMO_SUBSCRIPTIONS = (
+	{
+		"subscription_name": "Netflix",
+		"vendor": "Netflix",
+		"plan_name": "Premium",
+		"amount": 499,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -150,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"color": "#e50914",
+		"prices": ((-60, 649, "Price rise, June"),),
+		"notes": "The price went up in June. The history keeps what it used to cost.",
+	},
+	{
+		"subscription_name": "Adobe Photoshop",
+		"vendor": "Adobe",
+		"plan_name": "Photography, annual",
+		"amount": 12999,
+		"billing_frequency": "Yearly",
+		"category": "Subscriptions",
+		# Renews in a fortnight with ten days' notice needed, so the window is closing now.
+		# The one date only a subscription knows, and the reason this doctype exists.
+		"start_in_days": -350,
+		"notice_period_days": 10,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"color": "#31a8ff",
+		"notes": "Cancel by the date on the block above, or it renews for another year.",
+	},
+	{
+		"subscription_name": "Notion AI",
+		"vendor": "Notion",
+		"plan_name": "Plus",
+		"amount": 800,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -10,
+		"trial_in_days": 4,
+		"payment_method": "Credit Card",
+		"account": "HDFC Credit Card",
+		"notes": "Free until the trial ends. The only state in this app where doing nothing costs money.",
+	},
+	{
+		"subscription_name": "Gym Membership",
+		"vendor": "Cult Fit",
+		"amount": 1500,
+		"billing_frequency": "Monthly",
+		"category": "Personal Care",
+		"start_in_days": -200,
+		"status": "Paused",
+		"account": "HDFC Bank",
+		"payment_method": "UPI",
+		"notes": "Paused, not cancelled — so it costs nothing and is still on the list.",
+	},
+	{
+		"subscription_name": "Cloud Storage",
+		"vendor": "Google",
+		"plan_name": "200 GB",
+		"amount": 199,
+		"billing_frequency": "Monthly",
+		"category": "Subscriptions",
+		"start_in_days": -400,
+		"status": "Cancelled",
+		"end_in_days": 40,
+		"account": "HDFC Credit Card",
+		"payment_method": "Credit Card",
+		"notes": "Cancelled, and paid for until the end date — so it is still in Subscription Spend.",
+	},
+)
+
+
+# One loan each way, because `direction` is the field every sign in a loan posting follows from
+# and a demo with only one side proves nothing about it.
+#
+# `start_month` indexes the demo's months, so both loans are disbursed inside a period the
+# Fiscal Year covers — a disbursal is a real posting and ERPNext refuses one outside a year.
+# `unpaid` leaves that many elapsed instalments unposted, which is the only way to see the
+# arrears state and the `Loans in Arrears` card reading anything but zero.
+DEMO_LOANS = (
+	{
+		# A *personal* loan on purpose, not a car loan: a personal loan is disbursed into your
+		# bank account, which is something this app can model today. A car loan is disbursed to
+		# the dealer and what you get is the car — an asset, and `Money Asset` is A4.2. Seeding
+		# one would have shown five lakh of imaginary cash sitting in the current account.
+		"loan_name": "Personal Loan",
+		"direction": "Borrowed",
+		"principal": 200000,
+		"interest_rate": 12,
+		"interest_type": "Reducing Balance",
+		"tenure_months": 24,
+		"loan_account": "Personal Loan",
+		"interest_category": "Interest Paid",
+		"counterparty": "HDFC Bank",
+		"account": "HDFC Bank",
+		"start_month": 0,
+		"unpaid": 1,
+		"color": "#c0392b",
+		"notes": "Two years at 12% reducing. One instalment behind on purpose — the schedule shows which.",
+	},
+	{
+		"loan_name": "Loan to Ravi",
+		"direction": "Lent",
+		"principal": 50000,
+		"interest_rate": 0,
+		"interest_type": "Reducing Balance",
+		"tenure_months": 10,
+		"loan_account": "Loan to Ravi",
+		"interest_category": "Other Income",
+		"counterparty": "Ravi",
+		"account": "HDFC Bank",
+		"start_month": 1,
+		"unpaid": 0,
+		"notes": "Interest-free, and money owed *to* the household — so it is an asset, not a debt.",
+	},
+)
+
+
 def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_NAME):
 	"""Create the demo tracker and post its transactions. Returns a summary dict.
 
@@ -504,8 +709,298 @@ def setup_demo_data(months=DEFAULT_MONTHS, user=None, tracker_name=DEMO_TRACKER_
 	goals = _create_goals(tracker, accounts, period)
 	budgets = _create_budgets(tracker, period)
 	plans = _create_recurring(tracker, accounts, methods, period, posted_by_day)
+	_create_tags(tracker, posted_by_day)
+	_split_a_grocery_run(tracker, posted_by_day)
+	_charge_a_transfer_fee(tracker, accounts, period)
+	_reconcile_the_oldest_month(tracker, period)
+	_create_bills(tracker, accounts, methods)
+	_create_subscriptions(tracker, accounts, methods)
+	_create_loans(tracker, accounts, period)
+	_attach_a_receipt(tracker, posted_by_day)
 
 	return _summary(tracker, tracker_name, period, posted, skipped, goals, budgets, plans)
+
+
+def _create_tags(tracker, posted_by_day):
+	"""Label a few of the posted transactions, some with more than one tag.
+
+	Deliberately overlapping: a cafe bill on a family outing is Family *and* Treats, and the
+	Spending by Tag chart is only honest if the demo shows totals that do not add up to the
+	tracker's spending.
+	"""
+	tags = {}
+	for row in DEMO_TAGS:
+		doc = frappe.get_doc({"doctype": "Money Tag", "tracker": tracker, **row})
+		doc.insert(ignore_permissions=True)
+		tags[row["tag_name"]] = doc.name
+
+	for day, names in DEMO_TAGGED:
+		posted = posted_by_day.get(day)
+		if not posted:
+			frappe.throw(_("DEMO_TAGGED names day {0}, which no MONTHLY row posts on.").format(day))
+		# A tag on a Transfer is legal and invisible: an account-to-account movement has no
+		# category, so it never appears in the Expense view and the chart bar reads zero. That
+		# looks like a working demo, which is exactly why it is refused here.
+		if frappe.db.get_value("Transaction", posted[0], "transaction_type") != "Expense":
+			frappe.throw(
+				_("DEMO_TAGGED names day {0}, which is not an expense. Tag totals would read zero.").format(
+					day
+				)
+			)
+		for transaction in posted[:2]:
+			doc = frappe.get_doc("Transaction", transaction)
+			doc.set("tags", [{"tag": tags[name]} for name in names])
+			doc.save(ignore_permissions=True)
+
+	return list(tags.values())
+
+
+def _split_a_grocery_run(tracker, posted_by_day):
+	"""Turn one posted grocery bill into a split across two categories.
+
+	Cancelled and re-posted rather than edited: the splits change what is debited, and a
+	submitted transaction's ledger rows are immutable by design. Doing it the long way here is
+	the demo agreeing with the rules rather than going around them.
+	"""
+	candidates = posted_by_day.get(8, ())  # the grocery run, 6,800
+	if not candidates:
+		return None
+
+	original = frappe.get_doc("Transaction", candidates[-1])
+	household = _category_named(tracker, "Household")
+	if not household or not original.category:
+		return None
+
+	amount = flt(original.amount)
+	major = flt(amount * 0.8, 2)
+	original.cancel()
+
+	replacement = frappe.get_doc(
+		{
+			"doctype": "Transaction",
+			"tracker": tracker,
+			"date": original.date,
+			"transaction_type": "Expense",
+			"amount": amount,
+			"currency": original.currency,
+			"account": original.account,
+			"payment_method": original.payment_method,
+			"merchant": original.merchant,
+			"notes": "Split: most of it food, the rest household goods.",
+			"splits": [
+				{"category": original.category, "amount": major},
+				{"category": household, "amount": flt(amount - major, 2)},
+			],
+		}
+	)
+	replacement.insert(ignore_permissions=True)
+	replacement.submit()
+	return replacement.name
+
+
+def _charge_a_transfer_fee(tracker, accounts, period):
+	"""One transfer that cost something, so the fee shows up as expense."""
+	charges = _category_named(tracker, "Bank Charges & Fees")
+	if not charges:
+		return None
+
+	transfer = frappe.get_doc(
+		{
+			"doctype": "Transaction",
+			"tracker": tracker,
+			"date": getdate(period[-1]).replace(day=8),
+			"transaction_type": "Transfer",
+			"amount": 25000,
+			"account": accounts["HDFC Bank"],
+			"destination_account": accounts["Emergency Fund"],
+			"fee_amount": 50,
+			"fee_category": charges,
+			"notes": "A transfer that cost 50 to make.",
+		}
+	)
+	transfer.insert(ignore_permissions=True)
+	transfer.submit()
+	return transfer.name
+
+
+def _reconcile_the_oldest_month(tracker, period):
+	"""Tick off the first month, so an account opens part-reconciled rather than blank."""
+	cutoff = get_last_day(getdate(period[0]))
+	names = frappe.get_all(
+		"Transaction",
+		filters={"tracker": tracker, "docstatus": 1, "date": ["<=", cutoff]},
+		pluck="name",
+	)
+	for name in names:
+		frappe.db.set_value(
+			"Transaction",
+			name,
+			{"is_reconciled": 1, "cleared_date": frappe.db.get_value("Transaction", name, "date")},
+			update_modified=False,
+		)
+	return len(names)
+
+
+def _create_bills(tracker, accounts, methods):
+	"""Three bills: one due shortly, one that varies, one overdue.
+
+	Dated relative to today rather than to the demo's months, because a bill is about what is
+	coming — a reminder for something that was due in April is not a reminder.
+	"""
+	created = []
+	for row in DEMO_BILLS:
+		fields = {k: v for k, v in row.items() if k not in ("due_in_days", "category", "merchant")}
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Bill",
+				"tracker": tracker,
+				"due_date": add_days(today(), row["due_in_days"]),
+				"category": _category_named(tracker, row["category"]),
+				"account": accounts["HDFC Bank"],
+				"payment_method": methods.get("UPI"),
+				"merchant": merchants_service.resolve(row.get("merchant"), tracker, create=True),
+				**fields,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+	return created
+
+
+def _create_loans(tracker, accounts, period):
+	"""Two loans, disbursed and part repaid, one of them a month behind.
+
+	The instalments go in through `post_instalment` rather than by writing transactions
+	directly, so the demo takes exactly the path the form takes — and so a demo that seeded a
+	wrong principal-and-interest split would be a demo that could not have been produced by
+	clicking the button.
+	"""
+	created = []
+	for row in DEMO_LOANS:
+		# Clamped, because the number of months is an argument: `setup_demo_data(months=1)` has
+		# only one to index into, and a loan disbursed outside the demo's own window would be a
+		# posting outside a Fiscal Year.
+		start = getdate(period[min(row["start_month"], len(period) - 1)])
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Loan",
+				"tracker": tracker,
+				"loan_name": row["loan_name"],
+				"direction": row["direction"],
+				"principal": row["principal"],
+				"interest_rate": row["interest_rate"],
+				"interest_type": row["interest_type"],
+				"tenure_months": row["tenure_months"],
+				"start_date": start,
+				"loan_account": accounts[row["loan_account"]],
+				"interest_category": _category_named(tracker, row["interest_category"]),
+				"counterparty": merchants_service.resolve(row.get("counterparty"), tracker, create=True),
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		doc.disburse(account=accounts[row["account"]], on_date=start)
+		doc.reload()
+
+		# Every instalment whose date has passed, less the ones deliberately left behind. Each
+		# is posted on its own due date, so the schedule and the ledger tell the same story.
+		due = [
+			instalment
+			for instalment in loans_service.schedule_rows(doc)
+			if instalment.due_date <= getdate(today())
+		]
+		for instalment in due[: max(len(due) - int(row["unpaid"]), 0)]:
+			if not _covered_by_a_fiscal_year(instalment.due_date):
+				continue
+			doc.post_instalment(from_account=accounts[row["account"]], paid_on=instalment.due_date)
+
+		created.append(doc.name)
+	return created
+
+
+def _create_subscriptions(tracker, accounts, methods):
+	"""Five arrangements, one in each state a subscription can be in.
+
+	The price rises go in through `record_price` rather than by writing the parent's `amount`,
+	because the history is the source of truth and the field is a cache of the newest row — so
+	the seeder records what happened and lets `sync_price_history` work out what it costs now.
+	That is the same path the form takes, which is the point: a fixture that wrote the cache
+	directly would prove nothing about the rule.
+	"""
+	created = []
+	for row in DEMO_SUBSCRIPTIONS:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Subscription",
+				"tracker": tracker,
+				"subscription_name": row["subscription_name"],
+				"vendor": merchants_service.resolve(row.get("vendor"), tracker, create=True),
+				"plan_name": row.get("plan_name"),
+				"amount": row["amount"],
+				"billing_frequency": row["billing_frequency"],
+				"category": _category_named(tracker, row["category"]),
+				"account": accounts[row["account"]],
+				"payment_method": methods.get(row.get("payment_method")),
+				"start_date": add_days(today(), row["start_in_days"]),
+				"trial_end_date": add_days(today(), row["trial_in_days"]) if "trial_in_days" in row else None,
+				"end_date": add_days(today(), row["end_in_days"]) if "end_in_days" in row else None,
+				"notice_period_days": row.get("notice_period_days", 0),
+				"status": row.get("status", "Active"),
+				"color": row.get("color"),
+				"notes": row.get("notes"),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+		if row.get("prices"):
+			for offset, amount, note in row["prices"]:
+				doc.record_price(amount, add_days(today(), offset), note)
+			doc.save(ignore_permissions=True)
+
+		created.append(doc.name)
+	return created
+
+
+def _attach_a_receipt(tracker, posted_by_day):
+	"""One receipt on a transaction and one in the inbox, so both states are visible.
+
+	The files do not exist on disk. A receipt is a pointer to a File, and the demo is about
+	the shape of the record rather than about producing a JPEG — Desk shows a broken preview
+	and everything else behaves exactly as it would.
+	"""
+	created = []
+	attached = next(iter(posted_by_day.get(15, ())), None)  # the restaurant bill
+	if attached:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Money Receipt",
+				"tracker": tracker,
+				"transaction": attached,
+				"title": "Restaurant bill.jpg",
+				"image": "/files/demo-restaurant-bill.jpg",
+				"notes": "Attached to a transaction.",
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+
+	loose = frappe.get_doc(
+		{
+			"doctype": "Money Receipt",
+			"tracker": tracker,
+			"title": "Chemist receipt.pdf",
+			"file": "/files/demo-chemist-receipt.pdf",
+			"notes": "Captured but not yet entered — this is the inbox case.",
+		}
+	)
+	loose.insert(ignore_permissions=True)
+	created.append(loose.name)
+	return created
+
+
+def _category_named(tracker, category_name):
+	return frappe.db.get_value("Category", {"tracker": tracker, "category_name": category_name}, "name")
 
 
 def _create_tracker(user, tracker_name):
@@ -817,6 +1312,11 @@ def _covered_by_a_fiscal_year(date):
 
 
 def _summary(tracker, tracker_name, period, posted, skipped, goal_names, budget_names, plan_names):
+	# Counted from the tracker rather than taken from the plan loop's tally. The loop knows
+	# about MONTHLY and ONE_OFFS; it does not know about the split that is cancelled and
+	# re-posted, or the transfer that carries a fee, and a summary that disagrees with the
+	# database is worse than no summary. Self-correcting for whatever gets seeded next.
+	posted = frappe.db.count("Transaction", {"tracker": tracker})
 	currency = frappe.db.get_value("Tracker", tracker, "base_currency")
 	rows = balances.get_balances_for_tracker(tracker)
 	net_worth = balances.get_net_worth(tracker)
@@ -911,10 +1411,20 @@ def clear_demo_data(tracker=None, tracker_name=None):
 		"transactions": frappe.db.count("Transaction", {"tracker": tracker}),
 	}
 
+	# Transactions go by raw table delete rather than `delete_doc` — there can be hundreds and
+	# their ledger rows are handled above — which means **their child rows have to go by hand**.
+	# `Journal Entry Account` below has always been cleared this way; `Transaction` needed
+	# nothing until it grew child tables in A1, and a split row whose parent is gone is
+	# invisible until something counts it.
+	transactions = frappe.get_all("Transaction", filters={"tracker": tracker}, pluck="name")
+
 	frappe.db.delete("GL Entry", {"tracker": tracker})
 	if journal_entries:
 		frappe.db.delete("Journal Entry Account", {"parent": ["in", journal_entries]})
 		frappe.db.delete("Journal Entry", {"name": ["in", journal_entries]})
+	if transactions:
+		for child in TRANSACTION_CHILD_TABLES:
+			frappe.db.delete(child, {"parent": ["in", transactions]})
 	frappe.db.delete("Transaction", {"tracker": tracker})
 
 	# Goals, budgets and standing orders before accounts and categories: they link to both, and
@@ -924,6 +1434,11 @@ def clear_demo_data(tracker=None, tracker_name=None):
 	removed["goals"] = _delete_all("Money Goal", {"tracker": tracker})
 	removed["budgets"] = _delete_all("Money Budget", {"tracker": tracker})
 	removed["recurring"] = _delete_all("Money Recurring Transaction", {"tracker": tracker})
+	removed["bills"] = _delete_all("Money Bill", {"tracker": tracker})
+	removed["subscriptions"] = _delete_all("Money Subscription", {"tracker": tracker})
+	removed["loans"] = _delete_all("Money Loan", {"tracker": tracker})
+	removed["receipts"] = _delete_all("Money Receipt", {"tracker": tracker})
+	removed["tags"] = _delete_all("Money Tag", {"tracker": tracker})
 	removed["merchants"] = _delete_all("Money Merchant", {"tracker": tracker})
 	removed["money_accounts"] = _delete_all("Money Account", {"tracker": tracker})
 	removed["categories"] = _delete_categories(tracker)

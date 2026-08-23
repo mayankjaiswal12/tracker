@@ -8,23 +8,25 @@ green *and* it has been looked at in Desk.
 
 ---
 
-## Where we are — 2026-08-22
+## Where we are — 2026-08-23
 
 | | |
 |---|---|
-| Branch | `feat/phase-3-splits` |
-| Tests | **617 green**, ~73s |
-| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`) |
-| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1.1 tags · A1.3 merchants · A1.4 splits** |
-| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred four times** |
+| Branch | `feat/phase-a2-loans`, off `feat/phase-a2-subscriptions` |
+| Tests | **891 green**, ~111s |
+| Site | `tracker.localhost`, one tracker: `Demo Household` (`TRK-00002`), reseeded 2026-08-23 after A2.2 |
+| Shipped | Phase 1 complete · Phase 2: goals, budgets, recurring · **A1 complete** · **A2.1 subscriptions** · **A2.2 loans** |
+| **Blocking** | **The manual Desk pass — owed since Phase 1, deferred seven times** |
 
-### The one thing owed
+### The one thing owed — now actually clickable
 
-The manual Desk pass (`docs/manual-test-desk.md`). 617 automated tests say the arithmetic is
+The manual Desk pass (`docs/manual-test-desk.md`). 716 automated tests say the arithmetic is
 right; nothing yet says the app *looks* right. A headless pre-flight on 2026-08-20 confirmed
 every figure and every widget lookup, so what remains is genuinely browser-only.
 
-It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in a browser.
+It gates A1, A2.1 and now A2.2. Nothing further should land on a Phase 1 nobody has looked at in
+a browser — `docs/manual-test-desk.md` is now §1–§15 plus §17–§23, with cleanup at §25, and every
+A1, A2.1 and A2.2 figure in it was verified against the reseeded demo on 2026-08-23.
 
 ---
 
@@ -32,6 +34,13 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 | Module | Date | Branch | Tests |
 |---|---|---|---|
+| `Money Loan` + the `Loan Payment` strategy — amortisation | 2026-08-23 | `feat/phase-a2-loans` | ✅ tests, Desk unseen |
+| Number Cards route on click | 2026-08-23 | `feat/phase-a2-subscriptions` | ✅ |
+| `Money Subscription` — the terms, where a plan holds only the money | 2026-08-23 | `feat/phase-a2-subscriptions` | ✅ tests, Desk unseen |
+| `Money Bill` — money owed, tracked until settled | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
+| `Money Receipt` — the paper behind a transaction | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
+| Reconciliation — ticking off against a statement | 2026-08-22 | `feat/phase-3-a1-rest` | ✅ tests, Desk unseen |
+| Transfer & card-payment fees | 2026-08-22 | `feat/phase-3-transfer-fees` | ✅ tests, Desk unseen |
 | `Money Transaction Split` — one payment, several categories | 2026-08-22 | `feat/phase-3-splits` | ✅ tests, Desk unseen |
 | `Money Merchant` — who the money went to | 2026-08-22 | `feat/phase-3-merchants` | ✅ tests, Desk unseen |
 | `Money Tag` — labels that cut across categories | 2026-08-22 | `feat/phase-3-tags` | ✅ tests, Desk unseen |
@@ -52,25 +61,25 @@ It gates all of A1. Nothing new should land on a Phase 1 nobody has looked at in
 
 Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 
-### A1 — core missing functionality *(gated on the Desk pass)*
+### A1 — core missing functionality — **all seven built, none seen in Desk**
 
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
-| — | **Manual Desk pass** | 🟡 | `feat/phase-2-recurring` | Gate for everything below |
+| — | **Manual Desk pass** | ⏸ | `feat/phase-a2-loans` | Gate for everything below. Deferred eight times; the user said on 2026-08-23 they would do it later, so it is queued rather than blocking |
 | A1.1 | Tags | 🟡 | `feat/phase-3-tags` | Code + 33 tests green; **Desk unseen**. Tag totals overlap by design; `total`/`tagged` measured without the join |
-| A1.2 | Receipts and attachments | ⬜ | | OCR-ready columns filled by nothing until B5 |
+| A1.2 | Receipts and attachments | 🟡 | `feat/phase-3-a1-rest` | 15 tests. Standalone doctype, not a child table — paper is captured before it is entered |
 | A1.3 | Merchant master | 🟡 | `feat/phase-3-merchants` | Code + 36 tests green; **Desk unseen**. `Data → Link` done; patch linked 49 refs to 12 records |
 | A1.4 | Split transactions | 🟡 | `feat/phase-3-splits` | Code + 25 tests green; **Desk unseen**. Engine untouched, as designed |
-| A1.5 | Transfer fees | ⬜ | | Third leg in `strategies/transfer.py` |
-| A1.6 | Reconciliation | ⬜ | | `reference_no`, `is_reconciled`, `cleared_date` |
-| A1.7 | Bills and reminders | ⬜ | | A bill is a claim; a plan is a schedule |
+| A1.5 | Transfer fees | 🟡 | `feat/phase-3-transfer-fees` | Code + 22 tests green; **Desk unseen**. Restated the balance-sheet-only invariant |
+| A1.6 | Reconciliation | 🟡 | `feat/phase-3-a1-rest` | 20 tests. Changes no money; no adjustment entry, on purpose |
+| A1.7 | Bills and reminders | 🟡 | `feat/phase-3-a1-rest` | 41 tests. Mark Paid posts and mints the next; daily reminder job |
 
 ### A2 — productivity
 
 | | Module | Status | Branch | Notes |
 |---|---|---|---|---|
-| A2.1 | `Money Subscription` | ⬜ | | Boundary already drawn in `services/recurring.py` |
-| A2.2 | `Money Loan` + `Loan Payment` strategy | ⬜ | | Clears one of nine `PLANNED` types |
+| A2.1 | `Money Subscription` | 🟡 | `feat/phase-a2-subscriptions` | Code + 82 tests green; **Desk unseen**. Terms only — it posts nothing. Price history is the one stored series in the app. *Subscriptions by Renewal* deferred to A3 with the rest of `report/` |
+| A2.2 | `Money Loan` + `Loan Payment` strategy | 🟡 | `feat/phase-a2-loans` | Code + 87 tests green; **Desk unseen**. `build_schedule` is pure. Cleared the **first** of the nine `PLANNED` types. Interest became the third `SIDE_CHARGES` row — and revealed that transfer fees had never reached the spending trend |
 | A2.3 | Budget completion | ⬜ | | Account-wise, custom range, templates |
 | A2.4 | Recurring completion | ⬜ | | Skip Next, custom interval, pre-reminder |
 | A2.5 | Saved views / calendar / global search | ⬜ | | Needs A1.1, A1.3 |
@@ -106,6 +115,147 @@ Legend: ⬜ not started · 🟡 in progress · ✅ done · ⏸ deferred
 | B4 | Trends, quantile forecasts, scenarios | ⬜ | | Needs B2. Median/MAD, P10/P50/P90 |
 | B5 | Advisor, compliance, feedback loop | ⬜ | | Needs B2 + B4 |
 | B5b | Tier-1 ML | ⬜ | | Needs the feedback loop's labels |
+
+---
+
+## Notes from A2.2 (loans)
+
+- **Every payment is two facts at once**, and that is the whole module. Principal is a balance
+  coming down and is not spending; interest is the price of the money and is the only part that
+  makes anybody poorer. Book the whole instalment as expense and the household looks poorer by
+  the principal every month; book none of it and the entire cost of borrowing disappears. A Debt
+  Payoff goal cannot say that, which is why it keeps the simple case and a loan owns amortisation.
+- **The app's one stored schedule, and the rule that makes it safe.** A schedule is a pure
+  function of the terms, so keeping a copy is normally the drift this codebase refuses — but the
+  terms **freeze** the moment a payment is posted. A copy of something that cannot change cannot
+  drift, and freezing is also right on its own: a loan is not renegotiated by editing a field.
+- **The last instalment absorbs the rounding.** A level EMI rounded to paise cannot clear the
+  principal exactly; repeating it leaves a residue owing forever. The check that it worked is one
+  line — the schedule's principal must come back as exactly the loan's.
+- **A loan has to be disbursed, and a test found that out.** With the principal not on the books
+  the loan account sits at zero, payments drive it *negative*, and `outstanding <= 0` read the
+  loan as `Closed` after its first instalment. Disbursal is a plain **Transfer** and needed no new
+  strategy — a movement between two balance-sheet accounts is exactly what it is — and
+  `Not Disbursed` is now a derived outcome, because zero is indistinguishable from paid off.
+- **`direction` is a field because both readings balance.** Borrowed sits on a liability with
+  expense interest; lent sits on an asset with income interest. Reversed, the entry still posts
+  three balanced legs and the Balance Sheet quietly says the household owns what it owes. So the
+  controller checks the sides at Save and the strategy trusts it.
+- **Arrears are counted, not matched date for date.** Somebody who clears March and April in one
+  afternoon is not behind. A schedule is not a set of individual claims the way bills are, which
+  is the one place a loan and a bill genuinely differ in how they are measured.
+- **`post_instalment` reads the interest off the schedule.** The agreement says what this month's
+  interest is; paying a round number does not change it. Which makes anything above the scheduled
+  instalment go to principal — exactly what a part-prepayment is, for free.
+- **The A1 aggregation lesson, applied before it could bite.** Interest is charged to a category
+  on a voucher whose type is not a spending type, so it was invisible to both `categories`
+  queries by construction. Rather than write a third hand-rolled query, the two became
+  `SIDE_CHARGES`, a table with one row per kind. **And that surfaced a live bug:** transfer fees
+  had never reached `trends.get_period_series`, so a fee was spending on the category roll-up and
+  on every budget but *not* on "Expenses This Month" or the spending chart — the same money
+  reading two ways on one screen. `get_side_charges_by_date` closes it, and the demo's
+  Expenses This Month moved by exactly the ₹50 fee.
+- **`Interest Paid` was added to `DEFAULT_CATEGORIES`** (39 now, was 38). A loan requires an
+  interest category, and the alternative was every household filing interest under Bank Charges,
+  where it stops being separable from a 50-rupee transfer fee.
+
+---
+
+## Notes from A2.1 (subscriptions)
+
+- **It is the first module that is neither a measurement nor a posting.** A goal, a budget and a
+  card all read the ledger; a plan writes to it. A subscription does neither: it records terms,
+  and the money either comes from the plan it links to or from somebody paying by hand. That is
+  why there is no strategy, no `generate()` and no Journal Entry anywhere in it.
+- **Price history had to be stored, and it is the only thing in this app that does.** Every
+  other figure is measured from `GL Entry` on read because a stored copy drifts. A price cannot
+  be measured from the ledger at all — a month somebody forgot to pay looks exactly like a month
+  the thing was free. So `Money Subscription Price` is the truth and `amount` is a cache of the
+  newest row, the same relationship `Money Account.current_balance` has with the ledger.
+- **The rule for keeping the two in step is about which one the user touched.** Field changed →
+  the history records it, dated today. Table changed → the field is brought back into line with
+  the newest row *by date*, which is not the last child row: a rise recorded after the fact lands
+  at the bottom of the grid.
+- **A trial anchors the billing calendar, rather than being a special case in every caller.**
+  `billing_start` is the day after the trial ends, so the same `recurring.next_date` gives the
+  first charge during a trial and every renewal after it, and the two can never disagree about
+  which day of the month it renews on.
+- **`is_committed` is decided by the dates, not by the outcome word.** The case that forced it:
+  a subscription cancelled in August with an end date in October is still being paid for until
+  October, and dropping it out of Subscription Spend the day somebody clicked Cancel would
+  understate two months of real money.
+- **`Subscription Spend` overlaps `Fixed Costs` on purpose.** A subscription paid by a standing
+  order is in both figures, and nothing sums them — the same honest overlap a tag total has with
+  a category total. They answer different questions, and a household cancels a subscription
+  rather than a standing order.
+- **One plan pays one subscription**, refused at save, or the plan's money is claimed twice. A
+  plan whose *amount* disagrees with the price is reported and never refused: knowing about a
+  rise before the standing order is updated is the normal order of events.
+- **`recurring.FREQUENCIES` is shared rather than copied.** A subscription billed quarterly and a
+  plan running quarterly are on the same calendar, and two tables of the same six words are two
+  tables that will disagree. `test_subscriptions.TestFormWiring` asserts the DocType's Select
+  matches that table, and that `status` offers only the user's own three decisions.
+
+---
+
+## Notes from closing the Desk gaps
+
+- **Three A1 modules had no UI at all.** The bill cards existed as API methods with no Number
+  Card fixtures, `mark_paid` was whitelisted but had no button, and the reconciliation service
+  had nothing calling it. Built as backend, never wired.
+- **`clear_demo_data` was leaving orphaned child rows.** Transactions are removed by raw table
+  delete — deliberately, since there can be hundreds and the GL rows go separately — which
+  bypasses `delete_doc` and never touched child tables. Correct until A1 gave `Transaction`
+  two of them. `demo.TRANSACTION_CHILD_TABLES` now names them and a test derives the same list
+  from the doctype meta, so adding a third and forgetting the teardown fails rather than
+  orphaning rows.
+- **Two demo day references pointed at the wrong rows.** `DEMO_TAGGED` named day 10, which is a
+  **Transfer** — tagging one is legal and completely invisible, since a movement has no category
+  and never appears in the Expense view. It read as a working demo with an empty chart bar. Both
+  the missing-day and the not-an-expense cases now throw.
+- **`transactions_posted` now counts the tracker rather than the plan loop.** The loop knows
+  about MONTHLY and ONE_OFFS; it did not know about the split that is cancelled and re-posted
+  or the transfer carrying a fee.
+
+---
+
+## Notes from A1.2 / A1.6 / A1.7
+
+- **A receipt is a standalone doctype, not a child table**, and `transaction` is optional.
+  Paper is photographed at the till and typed up on Sunday; a child row cannot exist without a
+  parent. That also makes the unattached ones a real thing to show — an inbox.
+- **Reconciliation changes no money and offers no adjustment entry.** If the difference does
+  not close, the answer is a missing or wrong transaction. An app that plugs the gap has
+  stopped being a ledger.
+- **A bill is a claim; a plan is a schedule.** The giveaway is *overdue* — a state a standing
+  order cannot have. If a plan has not posted the scheduler is broken; if a bill has not been
+  paid, a person has not paid it. They compose: a bill may name the plan that settles it.
+- **A repeating bill mints its successor when it is paid**, one open bill at a time. Twelve
+  unpaid rows up front would make "what do I owe" meaningless and fire every reminder eleven
+  times.
+- **Bill names are unique per tracker only among *unpaid* bills** — unlike every other master
+  here — because a repeating bill reuses its own name every month.
+
+---
+
+## Notes from A1.5 (transfer fees)
+
+- **A documented invariant had to be restated, not worked around.** "Transfers and card
+  payments touch only balance-sheet accounts" was true and is now too strong: a fee is
+  spending, because the bank kept it. `docs/architecture.md` now says the *movement* is
+  balance-sheet only, and names the fee as the deliberate exception.
+- **The source pays `amount + fee`; the destination receives `amount`.** Netting the fee out
+  of what arrives would leave both balances right and understate expenses.
+- **Third aggregation site in three modules.** Splits and fees both attach money to a category
+  from a voucher whose own `category` is empty, and both had to be added to
+  `get_category_totals` *and* `get_net_spend_by_date`. Any future way of attaching money to a
+  category needs the same two edits — that is now a pattern worth watching, not a coincidence.
+- **And two edits turned out not to be enough.** A2.2 (2026-08-23) found that a fee had never
+  reached `trends.get_period_series` either, so it was spending on the category roll-up and in
+  every budget while **not** being spending on "Expenses This Month" or the spending chart. The
+  two hand-written queries are now `categories.SIDE_CHARGES`, with `get_side_charges_by_date` as
+  the window form for the periods — so there are three call sites and one table, rather than three
+  places to remember.
 
 ---
 
@@ -183,6 +333,13 @@ Carried from `task.md`; none are blocking.
 
 | Date | What |
 |---|---|
+| 2026-08-23 | **A2.2 loans shipped**; 891 tests. `Money Loan` + `Money Loan Schedule`, a pure `build_schedule`, the **Loan Payment strategy** (first of nine planned types cleared), Disburse / Post Instalment / Close actions, two cards, a Loans workspace section, two demo loans and `docs/manual-test-desk.md` §23. Found and fixed a real bug on the way: transfer fees had never reached the spending trend. |
+| 2026-08-23 | **Number Cards are clickable.** All thirteen are `type: "Custom"` and return a formatted string, so Frappe had no `route` to follow while its own CSS styled them `cursor: pointer`. `public/js/card_routes.js` + `app_include_js`; 804 tests. |
+| 2026-08-23 | **A2.1 subscriptions shipped**; 798 tests. `Money Subscription` + `Money Subscription Price`, two cards, a Subscriptions workspace section, a daily reminder job, five demo subscriptions and `docs/manual-test-desk.md` §22. Demo household reseeded, so §7's demo figures moved. |
+| 2026-08-22 | **Docs brought up to date** — architecture.md, roadmap.rst (§0 verdicts + A1 marked built), task.md, CLAUDE.md, manual-test-desk.md. |
+| 2026-08-22 | **Desk gaps closed.** 11 cards, 21 shortcuts, Mark Paid + Reconcile dialogs, filtered pickers, demo seeds all of A1, manual-test-desk §17–§22. Fixed an orphaned-child-row bug in `clear_demo_data`. 716 tests. |
+| 2026-08-22 | **A1 complete.** Receipts, reconciliation and bills shipped; 715 tests. |
+| 2026-08-22 | A1.5 transfer fees shipped; 639 tests. Restated the balance-sheet-only invariant in architecture.md. |
 | 2026-08-22 | A1.4 splits shipped; 617 tests. Category roll-ups and budgets made split-aware; fixed a whole-tracker budget double-count. |
 | 2026-08-22 | A1.3 merchants shipped; 592 tests. `Transaction.merchant` Data → Link, backfilled by `patches/v1_1/link_merchants`. Fixed a remark regression and a silently-broken merchant search. |
 | 2026-08-22 | A1.1 tags shipped; 556 tests. Also fixed a Desk write-back that had left the workspace DB row at `col: 12` with a newer `modified` than the file, so migrate skipped it. |

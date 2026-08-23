@@ -25,6 +25,7 @@ VOUCHER_TYPE_MAP = {
 	"Transfer": "Contra Entry",
 	"Credit Card Payment": "Credit Card Entry",
 	"Refund": "Journal Entry",
+	"Loan Payment": "Journal Entry",
 }
 
 
@@ -170,6 +171,13 @@ def check_sufficient_balance(transaction):
 		return
 	if transaction.transaction_type in ("Income", "Refund"):
 		return
+	# A repayment on money the household *lent* arrives rather than leaves, so there is nothing
+	# to have enough of. The direction lives on the loan, which is why this cannot be settled by
+	# the transaction type alone the way Income and Refund are.
+	if transaction.transaction_type == "Loan Payment" and transaction.loan:
+		direction = frappe.db.get_value("Money Loan", transaction.loan, "direction")
+		if direction == "Lent":
+			return
 
 	available = balances.get_account_balance(account.name)
 	if flt(available) < flt(transaction.amount):

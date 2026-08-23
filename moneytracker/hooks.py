@@ -28,7 +28,12 @@ required_apps = ["erpnext"]
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/moneytracker/css/moneytracker.css"
-# app_include_js = "/assets/moneytracker/js/moneytracker.js"
+#
+# Loaded on every Desk page for one reason: the workspace's Number Cards are all
+# `type: "Custom"` and return a formatted string, so Frappe has no `route` to follow when one is
+# clicked even though its own CSS styles them `cursor: pointer`. `public/js/card_routes.js`
+# holds the table of where each card's figure comes from and does the routing.
+app_include_js = "moneytracker.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/moneytracker/css/moneytracker.css"
@@ -132,6 +137,10 @@ permission_query_conditions = {
 	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 	"Money Merchant": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Receipt": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Bill": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Subscription": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
+	"Money Loan": "moneytracker.money_tracker.permissions.tracker_scoped_query_conditions",
 }
 
 has_permission = {
@@ -144,6 +153,10 @@ has_permission = {
 	"Money Recurring Transaction": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Tag": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 	"Money Merchant": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Receipt": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Bill": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Subscription": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
+	"Money Loan": "moneytracker.money_tracker.permissions.tracker_scoped_has_permission",
 }
 
 # DocType Class
@@ -169,18 +182,23 @@ has_permission = {
 # Scheduled Tasks
 # ---------------
 
-# Once a day is the right cadence for both of these, and both are idempotent, so the order
-# Frappe happens to run them in does not matter:
+# Once a day is the right cadence for all of these, and every one of them is idempotent, so
+# the order Frappe happens to run them in does not matter:
 #
 # * `run_recurring_transactions` holds no state at all — a second run posts nothing, because
 #   the transactions the first run made are already linked to their plans.
 # * `send_budget_alerts` stamps each budget with the period and outcome it last announced, so
 #   a second run on the same figures sends nothing. If it happens to run *before* this
 #   morning's rent posts, it simply says so again tomorrow with the fuller figure.
+# * `send_bill_reminders` and `send_subscription_reminders` stamp what they last announced in
+#   the same way, so an overdue bill nags once rather than every morning and a trial ending is
+#   mentioned once per trial.
 scheduler_events = {
 	"daily": [
 		"moneytracker.money_tracker.services.recurring.run_recurring_transactions",
 		"moneytracker.money_tracker.services.budgets.send_budget_alerts",
+		"moneytracker.money_tracker.services.bills.send_bill_reminders",
+		"moneytracker.money_tracker.services.subscriptions.send_subscription_reminders",
 	],
 }
 

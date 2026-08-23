@@ -3,7 +3,9 @@
     "allow": [
       "Read(//Users/mayankjaiswal/docker/frappe-production-projects/bench2/development/frappe-bench/**)",
       "Bash(python3 -c \"import json;d=json.load\\(open\\('sites/tracker.localhost/site_config.json'\\)\\);print\\({k:v for k,v in d.items\\(\\) if 'password' not in k}\\)\")",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(git check-ignore *)",
+      "Bash(grep -E '^\\(task|plan|progress\\)\\\\.md$')"
     ]
   }
 }

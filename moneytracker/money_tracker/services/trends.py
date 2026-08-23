@@ -7,12 +7,22 @@ The figures are read from `Transaction` rather than from `GL Entry`, for the sam
 the Number Cards are: a Refund has to *reduce* spending rather than count as income (§62),
 and that is a fact about the transaction type, not about the accounts its Journal Entry
 happened to touch.
+
+**And a transaction type is not the only way money becomes spending**, which is the second
+thing this module has to know. A transfer fee and a loan's interest are charged to an expense
+category on a voucher whose type is neither Expense nor Refund, so a query filtered on the type
+alone cannot see either — and they were both already reaching the category roll-up and every
+budget through `services/categories.py`. The same money reading as spending on one widget and
+not on another is exactly the contradiction §33 is about, so both are folded in here from the
+one table that describes them, `categories.SIDE_CHARGES`.
 """
 
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 from frappe.utils.dateutils import get_dates_from_timegrain, get_period, get_period_ending
+
+from moneytracker.money_tracker.services import categories
 
 # The grains Frappe's own chart widget offers. Anything else has no period-ending rule.
 INTERVALS = ("Yearly", "Quarterly", "Monthly", "Weekly", "Daily")
@@ -50,13 +60,16 @@ def get_period_series(tracker, from_date, to_date, interval="Monthly"):
 		group_by="date, transaction_type",
 	)
 
-	for row in rows:
-		period_end = getdate(get_period_ending(row.date, interval))
+	def bucket_for(date):
+		period_end = getdate(get_period_ending(date, interval))
 		if period_end not in buckets:
 			# Only reachable if a period boundary and the range disagree; bin it into the
 			# last period rather than dropping the money out of the chart entirely.
 			period_end = period_ends[-1]
-		bucket = buckets[period_end]
+		return buckets[period_end]
+
+	for row in rows:
+		bucket = bucket_for(row.date)
 
 		if row.transaction_type == "Income":
 			bucket["income"] += flt(row.total)
@@ -64,6 +77,11 @@ def get_period_series(tracker, from_date, to_date, interval="Monthly"):
 			bucket["expense"] -= flt(row.total)
 		else:
 			bucket["expense"] += flt(row.total)
+
+	# A transfer fee and a loan's interest: spending charged to a category on a voucher whose
+	# own type is not a spending type. Never refundable, so they only ever add.
+	for date, total in categories.get_side_charges_by_date(tracker, "Expense", from_date, to_date).items():
+		bucket_for(date)["expense"] += flt(total)
 
 	return [
 		{

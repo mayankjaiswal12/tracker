@@ -1,0 +1,19 @@
+{
+ "creation": "2026-08-23 10:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Money Subscription",
+ "filters_json": "{}",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Trials Ending",
+ "method": "moneytracker.money_tracker.api.subscriptions.card_trials_ending",
+ "modified": "2026-08-23 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Money Tracker",
+ "name": "Trials Ending",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "type": "Custom"
+}
